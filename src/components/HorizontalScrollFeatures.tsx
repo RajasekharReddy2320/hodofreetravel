@@ -113,7 +113,7 @@ const HorizontalScrollFeatures = () => {
       id="features" 
       ref={containerRef} 
       className="relative -mb-px" 
-      style={{ height: `${features.length * 100}vh` }}
+      style={{ height: `${features.length * 80}vh` }}
     >
       {/* Progress Indicator - Redesigned */}
       <div 
