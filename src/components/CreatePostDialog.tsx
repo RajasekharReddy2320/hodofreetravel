@@ -1,13 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PlusCircle, Upload, X, MapPin, Calendar, Plane } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { PlusCircle, Upload, X, MapPin, Calendar, Plane, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+interface SavedTrip {
+  id: string;
+  title: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  budget_inr: number | null;
+  itinerary: any;
+  planner_mode: string | null;
+}
 
 export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void }) => {
   const [open, setOpen] = useState(false);
@@ -16,6 +30,10 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
   const [imagePreview, setImagePreview] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [includeItinerary, setIncludeItinerary] = useState(false);
+  const [shareSavedPlan, setShareSavedPlan] = useState(false);
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [selectedTrip, setSelectedTrip] = useState<SavedTrip | null>(null);
+  const [loadingTrips, setLoadingTrips] = useState(false);
   const [itinerary, setItinerary] = useState({
     destination: "",
     startDate: "",
@@ -25,6 +43,31 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
     estimatedBudget: ""
   });
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (shareSavedPlan && open) {
+      loadSavedTrips();
+    }
+  }, [shareSavedPlan, open]);
+
+  const loadSavedTrips = async () => {
+    setLoadingTrips(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, title, destination, start_date, end_date, budget_inr, itinerary, planner_mode")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Error loading trips", description: error.message, variant: "destructive" });
+    } else {
+      setSavedTrips(data || []);
+    }
+    setLoadingTrips(false);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,35 +117,43 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
         imageUrl = publicUrl;
       }
 
-      const { error } = await supabase.from("posts").insert({
-        user_id: user.id,
-        content: content.trim(),
-        image_url: imageUrl,
-        itinerary: includeItinerary ? {
+      // Determine itinerary data
+      let itineraryData = null;
+      
+      if (shareSavedPlan && selectedTrip) {
+        // Use the saved trip's itinerary
+        itineraryData = {
+          ...selectedTrip.itinerary,
+          tripId: selectedTrip.id,
+          destination: selectedTrip.destination,
+          startDate: selectedTrip.start_date,
+          endDate: selectedTrip.end_date,
+          estimatedBudget: selectedTrip.budget_inr || 0,
+          plannerMode: selectedTrip.planner_mode,
+          isFromSavedPlan: true
+        };
+      } else if (includeItinerary) {
+        itineraryData = {
           destination: itinerary.destination,
           startDate: itinerary.startDate,
           endDate: itinerary.endDate,
           transportation: itinerary.transportation,
           activities: itinerary.activities.split(',').map(a => a.trim()),
           estimatedBudget: parseFloat(itinerary.estimatedBudget) || 0
-        } : null,
+        };
+      }
+
+      const { error } = await supabase.from("posts").insert({
+        user_id: user.id,
+        content: content.trim(),
+        image_url: imageUrl,
+        itinerary: itineraryData,
       });
 
       if (error) throw error;
 
       toast({ title: "Post created successfully!" });
-      setContent("");
-      setImageFile(null);
-      setImagePreview("");
-      setIncludeItinerary(false);
-      setItinerary({
-        destination: "",
-        startDate: "",
-        endDate: "",
-        transportation: "",
-        activities: "",
-        estimatedBudget: ""
-      });
+      resetForm();
       setOpen(false);
       onPostCreated();
     } catch (error: any) {
@@ -116,6 +167,23 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
     }
   };
 
+  const resetForm = () => {
+    setContent("");
+    setImageFile(null);
+    setImagePreview("");
+    setIncludeItinerary(false);
+    setShareSavedPlan(false);
+    setSelectedTrip(null);
+    setItinerary({
+      destination: "",
+      startDate: "",
+      endDate: "",
+      transportation: "",
+      activities: "",
+      estimatedBudget: ""
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -124,7 +192,7 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
           Create Post
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create a New Post</DialogTitle>
         </DialogHeader>
@@ -178,15 +246,74 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
           </div>
           
           <div className="space-y-4 border-t pt-4">
+            {/* Share Saved Trip Plan Option */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="shareSavedPlan"
+                checked={shareSavedPlan}
+                onCheckedChange={(checked) => {
+                  setShareSavedPlan(checked as boolean);
+                  if (checked) setIncludeItinerary(false);
+                }}
+              />
+              <Label htmlFor="shareSavedPlan" className="flex items-center gap-2 cursor-pointer">
+                <FolderOpen className="h-4 w-4" />
+                Share Your Trip Plan (from saved plans)
+              </Label>
+            </div>
+
+            {shareSavedPlan && (
+              <div className="pl-6 border-l-2 border-primary/20">
+                {loadingTrips ? (
+                  <p className="text-sm text-muted-foreground">Loading saved trips...</p>
+                ) : savedTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No saved trips found. Create a trip in the Travel Planner first.</p>
+                ) : (
+                  <ScrollArea className="h-48">
+                    <div className="space-y-2 pr-4">
+                      {savedTrips.map((trip) => (
+                        <Card 
+                          key={trip.id}
+                          className={`cursor-pointer transition-all ${selectedTrip?.id === trip.id ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`}
+                          onClick={() => setSelectedTrip(trip)}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-sm">{trip.title}</p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {trip.destination}
+                                </p>
+                              </div>
+                              {trip.planner_mode && (
+                                <Badge variant="secondary" className="text-xs capitalize">
+                                  {trip.planner_mode}
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+            )}
+
+            {/* Manual Itinerary Option */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="includeItinerary"
                 checked={includeItinerary}
-                onCheckedChange={(checked) => setIncludeItinerary(checked as boolean)}
+                onCheckedChange={(checked) => {
+                  setIncludeItinerary(checked as boolean);
+                  if (checked) setShareSavedPlan(false);
+                }}
               />
               <Label htmlFor="includeItinerary" className="flex items-center gap-2 cursor-pointer">
                 <MapPin className="h-4 w-4" />
-                Add Travel Itinerary (bookable by others)
+                Add Travel Itinerary (manual entry)
               </Label>
             </div>
             
@@ -266,7 +393,10 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !content.trim()}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || !content.trim() || (shareSavedPlan && !selectedTrip)}
+            >
               {isLoading ? "Posting..." : "Post"}
             </Button>
           </div>

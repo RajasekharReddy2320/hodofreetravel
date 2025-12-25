@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2, Bookmark, Trash2, MapPin, Calendar, Plane, IndianRupee, Send } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Trash2, MapPin, Calendar, Plane, IndianRupee, Send, Edit2, Download } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +22,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { CommentsSection } from "./CommentsSection";
 import { ItineraryBookingDialog } from "./ItineraryBookingDialog";
 import { ConnectButton } from "./ConnectButton";
+import { EditPostDialog } from "./EditPostDialog";
 
 interface PostCardProps {
   post: {
@@ -47,6 +48,8 @@ interface PostCardProps {
 export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -123,8 +126,44 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
     }
   };
 
+  const handleSavePlanToTrips = async () => {
+    if (!post.itinerary) return;
+    
+    setIsSavingPlan(true);
+    try {
+      const itinerary = post.itinerary;
+      
+      const { error } = await supabase.from("trips").insert({
+        user_id: currentUserId,
+        title: itinerary.title || `Trip to ${itinerary.destination}`,
+        destination: itinerary.destination,
+        start_date: itinerary.startDate,
+        end_date: itinerary.endDate,
+        trip_type: 'saved_from_post',
+        planner_mode: itinerary.plannerMode || null,
+        budget_inr: itinerary.estimatedBudget || null,
+        itinerary: itinerary,
+        is_public: false
+      });
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Plan Saved!", 
+        description: "This trip plan has been added to your saved trips." 
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error saving plan",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
   const handleDirectMessage = () => {
-    // Navigate to Explore page with the messages tab open and this user selected
     navigate("/", { state: { openMessages: true, userId: post.user_id } });
   };
 
@@ -136,175 +175,213 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
   const isOwner = post.user_id === currentUserId;
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-center gap-3 pb-3">
-        <Avatar className="cursor-pointer" onClick={() => navigate(`/profile/${post.user_id}`)}>
-          <AvatarImage src={post.profiles.avatar_url || undefined} />
-          <AvatarFallback>{getInitials(post.profiles.full_name)}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <p className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profile/${post.user_id}`)}>
-            {post.profiles.full_name || "Unknown User"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-          </p>
-        </div>
-        {!isOwner && (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleDirectMessage} title="Send Message">
-              <Send className="h-4 w-4" />
-            </Button>
-            <ConnectButton userId={post.user_id} currentUserId={currentUserId} />
+    <>
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-center gap-3 pb-3">
+          <Avatar className="cursor-pointer" onClick={() => navigate(`/profile/${post.user_id}`)}>
+            <AvatarImage src={post.profiles.avatar_url || undefined} />
+            <AvatarFallback>{getInitials(post.profiles.full_name)}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <p className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profile/${post.user_id}`)}>
+              {post.profiles.full_name || "Unknown User"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+            </p>
           </div>
-        )}
-        {isOwner && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Trash2 className="h-4 w-4 text-destructive" />
+          {!isOwner && (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={handleDirectMessage} title="Send Message">
+                <Send className="h-4 w-4" />
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Post</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this post? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3 pb-3">
-        <p className="whitespace-pre-wrap">{post.content}</p>
-        {post.image_url && (
-          <img
-            src={post.image_url}
-            alt="Post"
-            className="w-full rounded-lg object-cover max-h-96"
-          />
-        )}
-        
-        {post.itinerary && (
-          <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-accent" />
-                Travel Itinerary
-              </h3>
-              <Badge variant="secondary">Bookable</Badge>
+              <ConnectButton userId={post.user_id} currentUserId={currentUserId} />
             </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Destination</p>
-                  <p className="font-medium">{post.itinerary.destination}</p>
-                </div>
+          )}
+          {isOwner && (
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => setShowEditDialog(true)} title="Edit Post">
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this post? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3 pb-3">
+          <p className="whitespace-pre-wrap">{post.content}</p>
+          {post.image_url && (
+            <img
+              src={post.image_url}
+              alt="Post"
+              className="w-full rounded-lg object-cover max-h-96"
+            />
+          )}
+          
+          {post.itinerary && (
+            <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-accent" />
+                  {post.itinerary.isFromSavedPlan ? "Shared Trip Plan" : "Travel Itinerary"}
+                </h3>
+                <Badge variant="secondary">
+                  {post.itinerary.isFromSavedPlan ? "Full Plan" : "Bookable"}
+                </Badge>
               </div>
               
-              <div className="flex items-center gap-2 text-sm">
-                <Plane className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Transportation</p>
-                  <p className="font-medium">{post.itinerary.transportation}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Travel Dates</p>
-                  <p className="font-medium">
-                    {format(new Date(post.itinerary.startDate), "MMM dd")} - {format(new Date(post.itinerary.endDate), "MMM dd, yyyy")}
-                  </p>
-                </div>
-              </div>
-              
-              {post.itinerary.estimatedBudget > 0 && (
+              <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Budget</p>
-                    <p className="font-medium">₹{post.itinerary.estimatedBudget.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Destination</p>
+                    <p className="font-medium">{post.itinerary.destination}</p>
+                  </div>
+                </div>
+                
+                {post.itinerary.transportation && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Plane className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Transportation</p>
+                      <p className="font-medium">{post.itinerary.transportation}</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Travel Dates</p>
+                    <p className="font-medium">
+                      {format(new Date(post.itinerary.startDate), "MMM dd")} - {format(new Date(post.itinerary.endDate), "MMM dd, yyyy")}
+                    </p>
+                  </div>
+                </div>
+                
+                {post.itinerary.estimatedBudget > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Budget</p>
+                      <p className="font-medium">₹{post.itinerary.estimatedBudget.toLocaleString()}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {post.itinerary.activities && post.itinerary.activities.length > 0 && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground mb-1">Activities</p>
+                  <div className="flex flex-wrap gap-1">
+                    {post.itinerary.activities.map((activity: string, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {activity}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               )}
-            </div>
-            
-            {post.itinerary.activities && post.itinerary.activities.length > 0 && (
-              <div className="text-sm">
-                <p className="text-xs text-muted-foreground mb-1">Activities</p>
-                <div className="flex flex-wrap gap-1">
-                  {post.itinerary.activities.map((activity: string, idx: number) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {activity}
-                    </Badge>
-                  ))}
-                </div>
+
+              {post.itinerary.plannerMode && (
+                <Badge variant="secondary" className="capitalize">
+                  {post.itinerary.plannerMode} Mode
+                </Badge>
+              )}
+              
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setShowBookingDialog(true)}
+                  className="flex-1 gap-2"
+                >
+                  <Plane className="h-4 w-4" />
+                  Book This Trip
+                </Button>
+                
+                {!isOwner && (
+                  <Button 
+                    variant="outline"
+                    onClick={handleSavePlanToTrips}
+                    disabled={isSavingPlan}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isSavingPlan ? "Saving..." : "Save Plan"}
+                  </Button>
+                )}
               </div>
-            )}
-            
-            <Button 
-              onClick={() => setShowBookingDialog(true)}
-              className="w-full gap-2"
-            >
-              <Plane className="h-4 w-4" />
-              Book This Trip
-            </Button>
-          </div>
-        )}
-      </CardContent>
-      
-      {post.itinerary && (
-        <ItineraryBookingDialog
-          open={showBookingDialog}
-          onOpenChange={setShowBookingDialog}
-          itinerary={post.itinerary}
-          postAuthor={post.profiles.full_name || "Unknown User"}
-        />
-      )}
-      <CardFooter className="flex flex-col gap-3 pt-3 border-t">
-        <div className="flex items-center justify-between w-full">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-            onClick={handleLike}
-          >
-            <Heart className={`h-4 w-4 ${userLiked ? "fill-red-500 text-red-500" : ""}`} />
-            {post.likes_count}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-            onClick={() => setShowComments(!showComments)}
-          >
-            <MessageCircle className="h-4 w-4" />
-            {post.comments_count}
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-2" onClick={handleShare}>
-            <Share2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleSave}>
-            <Bookmark className={`h-4 w-4 ${userSaved ? "fill-current" : ""}`} />
-          </Button>
-        </div>
-        {showComments && (
-          <CommentsSection
-            postId={post.id}
-            currentUserId={currentUserId}
-            onCommentAdded={onUpdate}
+            </div>
+          )}
+        </CardContent>
+        
+        {post.itinerary && (
+          <ItineraryBookingDialog
+            open={showBookingDialog}
+            onOpenChange={setShowBookingDialog}
+            itinerary={post.itinerary}
+            postAuthor={post.profiles.full_name || "Unknown User"}
           />
         )}
-      </CardFooter>
-    </Card>
+        <CardFooter className="flex flex-col gap-3 pt-3 border-t">
+          <div className="flex items-center justify-between w-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              onClick={handleLike}
+            >
+              <Heart className={`h-4 w-4 ${userLiked ? "fill-red-500 text-red-500" : ""}`} />
+              {post.likes_count}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              onClick={() => setShowComments(!showComments)}
+            >
+              <MessageCircle className="h-4 w-4" />
+              {post.comments_count}
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-2" onClick={handleShare}>
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleSave}>
+              <Bookmark className={`h-4 w-4 ${userSaved ? "fill-current" : ""}`} />
+            </Button>
+          </div>
+          {showComments && (
+            <CommentsSection
+              postId={post.id}
+              currentUserId={currentUserId}
+              onCommentAdded={onUpdate}
+            />
+          )}
+        </CardFooter>
+      </Card>
+
+      <EditPostDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        post={post}
+        onPostUpdated={onUpdate}
+      />
+    </>
   );
 };
