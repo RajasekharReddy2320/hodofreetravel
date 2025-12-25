@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import FloatingParticles from "@/components/FloatingParticles";
-import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
+import HorizontalScroll from "@/components/HorizontalScroll";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { Plane, Sparkles, Globe, ChevronDown } from "lucide-react";
 
@@ -147,12 +147,12 @@ const Welcome = () => {
                     </Suspense>
                   </div>
 
-                  {/* Orbiting Planes */}
+                  {/* Orbiting Planes - both facing forward in their direction */}
                   <div className="absolute inset-0 animate-spin" style={{ animationDuration: '20s' }}>
-                    <Plane className="absolute -top-6 left-1/2 -translate-x-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(90deg)' }} />
+                    <Plane className="absolute -top-6 left-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(90deg)' }} />
                   </div>
                   <div className="absolute inset-0 animate-spin" style={{ animationDuration: '15s', animationDirection: 'reverse' }}>
-                    <Plane className="absolute -bottom-6 left-1/2 -translate-x-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(-90deg)' }} />
+                    <Plane className="absolute -bottom-6 left-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(90deg)' }} />
                   </div>
 
                   {/* Travel the World Text */}
@@ -173,7 +173,7 @@ const Welcome = () => {
         </section>
 
         {/* Horizontal Scroll Features */}
-        <HorizontalScrollFeatures />
+        <HorizontalScroll />
 
         {/* Featured Trips - No gap after features */}
         <FeaturedTrips />
