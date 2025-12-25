@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Upload, X } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Upload, X, MapPin, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface EditPostDialogProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface EditPostDialogProps {
     id: string;
     content: string;
     image_url: string | null;
+    itinerary?: any;
   };
   onPostUpdated: () => void;
 }
@@ -25,6 +27,7 @@ export const EditPostDialog = ({ open, onOpenChange, post, onPostUpdated }: Edit
   const [imagePreview, setImagePreview] = useState<string>(post.image_url || "");
   const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [itineraryAction, setItineraryAction] = useState<"keep" | "remove">("keep");
   const { toast } = useToast();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,11 +82,18 @@ export const EditPostDialog = ({ open, onOpenChange, post, onPostUpdated }: Edit
         imageUrl = null;
       }
 
+      // Handle itinerary
+      let itineraryData = post.itinerary;
+      if (itineraryAction === "remove") {
+        itineraryData = null;
+      }
+
       const { error } = await supabase
         .from("posts")
         .update({
           content: content.trim(),
           image_url: imageUrl,
+          itinerary: itineraryData,
           updated_at: new Date().toISOString()
         })
         .eq("id", post.id);
@@ -106,7 +116,7 @@ export const EditPostDialog = ({ open, onOpenChange, post, onPostUpdated }: Edit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Post</DialogTitle>
         </DialogHeader>
@@ -158,6 +168,39 @@ export const EditPostDialog = ({ open, onOpenChange, post, onPostUpdated }: Edit
               </div>
             )}
           </div>
+          
+          {/* Itinerary/Trip Plan Section */}
+          {post.itinerary && (
+            <div className="space-y-3 border-t pt-4">
+              <Label className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {post.itinerary.isFromSavedPlan ? "Shared Trip Plan" : "Travel Itinerary"}
+              </Label>
+              
+              <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{post.itinerary.destination}</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {post.itinerary.isFromSavedPlan ? "Full Plan" : "Itinerary"}
+                  </Badge>
+                </div>
+                
+                <RadioGroup value={itineraryAction} onValueChange={(v) => setItineraryAction(v as "keep" | "remove")} className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="keep" id="keep" />
+                    <Label htmlFor="keep" className="text-sm cursor-pointer">Keep this {post.itinerary.isFromSavedPlan ? "trip plan" : "itinerary"}</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="remove" id="remove" />
+                    <Label htmlFor="remove" className="text-sm cursor-pointer text-destructive flex items-center gap-1">
+                      <Trash2 className="h-3 w-3" />
+                      Remove from post
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+          )}
           
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

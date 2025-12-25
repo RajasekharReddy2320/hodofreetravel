@@ -77,6 +77,7 @@ const HorizontalScrollFeatures = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isInSection, setIsInSection] = useState(false);
 
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
@@ -86,6 +87,10 @@ const HorizontalScrollFeatures = () => {
     const containerTop = rect.top;
     const containerHeight = container.offsetHeight;
     const viewportHeight = window.innerHeight;
+
+    // Check if we're in the section
+    const inSection = containerTop <= 0 && containerTop > -(containerHeight - viewportHeight);
+    setIsInSection(inSection);
 
     const scrolled = -containerTop;
     const scrollableDistance = containerHeight - viewportHeight;
@@ -104,11 +109,16 @@ const HorizontalScrollFeatures = () => {
   const translateX = scrollProgress * (features.length - 1) * -100;
 
   return (
-    <section id="features" ref={containerRef} className="relative" style={{ height: `${features.length * 100}vh` }}>
+    <section 
+      id="features" 
+      ref={containerRef} 
+      className="relative" 
+      style={{ height: `${features.length * 100}vh`, marginBottom: 0 }}
+    >
       {/* Progress Indicator - Redesigned */}
       <div 
         className="fixed left-8 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col gap-4 transition-opacity duration-500"
-        style={{ opacity: scrollProgress > 0.02 && scrollProgress < 0.98 ? 1 : 0 }}
+        style={{ opacity: isInSection ? 1 : 0, pointerEvents: isInSection ? 'auto' : 'none' }}
       >
         <div className="bg-card/80 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border">
           {features.map((feature, idx) => (
@@ -154,7 +164,7 @@ const HorizontalScrollFeatures = () => {
       {/* Mobile Progress Dots */}
       <div 
         className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex lg:hidden gap-2 p-2 bg-card/80 backdrop-blur-xl rounded-full shadow-xl border transition-opacity duration-500"
-        style={{ opacity: scrollProgress > 0.02 && scrollProgress < 0.98 ? 1 : 0 }}
+        style={{ opacity: isInSection ? 1 : 0, pointerEvents: isInSection ? 'auto' : 'none' }}
       >
         {features.map((feature, idx) => (
           <button

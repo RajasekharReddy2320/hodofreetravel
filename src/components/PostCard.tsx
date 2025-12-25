@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2, Bookmark, Trash2, MapPin, Calendar, Plane, IndianRupee, Send, Edit2, Download } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Trash2, MapPin, Calendar, Plane, IndianRupee, Send, Edit2, Download, Eye } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { CommentsSection } from "./CommentsSection";
 import { ItineraryBookingDialog } from "./ItineraryBookingDialog";
+import { TripPlanViewDialog } from "./TripPlanViewDialog";
 import { ConnectButton } from "./ConnectButton";
 import { EditPostDialog } from "./EditPostDialog";
 
@@ -49,6 +50,7 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
   const [showComments, setShowComments] = useState(false);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPlanViewDialog, setShowPlanViewDialog] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -173,6 +175,7 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
   };
 
   const isOwner = post.user_id === currentUserId;
+  const isFromSavedPlan = post.itinerary?.isFromSavedPlan;
 
   return (
     <>
@@ -240,10 +243,10 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-accent" />
-                  {post.itinerary.isFromSavedPlan ? "Shared Trip Plan" : "Travel Itinerary"}
+                  {isFromSavedPlan ? "Shared Trip Plan" : "Travel Itinerary"}
                 </h3>
                 <Badge variant="secondary">
-                  {post.itinerary.isFromSavedPlan ? "Full Plan" : "Bookable"}
+                  {isFromSavedPlan ? "Full Plan" : "Bookable"}
                 </Badge>
               </div>
               
@@ -291,11 +294,16 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
                 <div className="text-sm">
                   <p className="text-xs text-muted-foreground mb-1">Activities</p>
                   <div className="flex flex-wrap gap-1">
-                    {post.itinerary.activities.map((activity: string, idx: number) => (
+                    {post.itinerary.activities.slice(0, 5).map((activity: string, idx: number) => (
                       <Badge key={idx} variant="outline" className="text-xs">
                         {activity}
                       </Badge>
                     ))}
+                    {post.itinerary.activities.length > 5 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{post.itinerary.activities.length - 5} more
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )}
@@ -307,24 +315,50 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
               )}
               
               <div className="flex gap-2">
-                <Button 
-                  onClick={() => setShowBookingDialog(true)}
-                  className="flex-1 gap-2"
-                >
-                  <Plane className="h-4 w-4" />
-                  Book This Trip
-                </Button>
-                
-                {!isOwner && (
-                  <Button 
-                    variant="outline"
-                    onClick={handleSavePlanToTrips}
-                    disabled={isSavingPlan}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    {isSavingPlan ? "Saving..." : "Save Plan"}
-                  </Button>
+                {isFromSavedPlan ? (
+                  // For shared trip plans - show View Plan and Save This Plan
+                  <>
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowPlanViewDialog(true)}
+                      className="flex-1 gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View Plan
+                    </Button>
+                    {!isOwner && (
+                      <Button 
+                        onClick={handleSavePlanToTrips}
+                        disabled={isSavingPlan}
+                        className="flex-1 gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {isSavingPlan ? "Saving..." : "Save This Plan"}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  // For regular itineraries - show Book Now
+                  <>
+                    <Button 
+                      onClick={() => setShowBookingDialog(true)}
+                      className="flex-1 gap-2"
+                    >
+                      <Plane className="h-4 w-4" />
+                      Book Now
+                    </Button>
+                    {!isOwner && (
+                      <Button 
+                        variant="outline"
+                        onClick={handleSavePlanToTrips}
+                        disabled={isSavingPlan}
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {isSavingPlan ? "Saving..." : "Save Plan"}
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -332,12 +366,21 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
         </CardContent>
         
         {post.itinerary && (
-          <ItineraryBookingDialog
-            open={showBookingDialog}
-            onOpenChange={setShowBookingDialog}
-            itinerary={post.itinerary}
-            postAuthor={post.profiles.full_name || "Unknown User"}
-          />
+          <>
+            <ItineraryBookingDialog
+              open={showBookingDialog}
+              onOpenChange={setShowBookingDialog}
+              itinerary={post.itinerary}
+              postAuthor={post.profiles.full_name || "Unknown User"}
+            />
+            <TripPlanViewDialog
+              open={showPlanViewDialog}
+              onOpenChange={setShowPlanViewDialog}
+              itinerary={post.itinerary}
+              currentUserId={currentUserId}
+              isOwner={isOwner}
+            />
+          </>
         )}
         <CardFooter className="flex flex-col gap-3 pt-3 border-t">
           <div className="flex items-center justify-between w-full">

@@ -149,10 +149,10 @@ const Welcome = () => {
 
                   {/* Orbiting Planes */}
                   <div className="absolute inset-0 animate-spin" style={{ animationDuration: '20s' }}>
-                    <Plane className="absolute -top-6 left-1/2 -translate-x-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'rotate(45deg)' }} />
+                    <Plane className="absolute -top-6 left-1/2 -translate-x-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(90deg)' }} />
                   </div>
                   <div className="absolute inset-0 animate-spin" style={{ animationDuration: '15s', animationDirection: 'reverse' }}>
-                    <Plane className="absolute -bottom-6 left-1/2 -translate-x-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'rotate(-135deg)' }} />
+                    <Plane className="absolute -bottom-6 left-1/2 -translate-x-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(-90deg)' }} />
                   </div>
 
                   {/* Travel the World Text */}
@@ -175,6 +175,7 @@ const Welcome = () => {
         {/* Horizontal Scroll Features */}
         <HorizontalScrollFeatures />
 
+        {/* Featured Trips - No gap after features */}
         <FeaturedTrips />
 
         {/* Feedback Section */}
