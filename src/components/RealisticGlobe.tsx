@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 
 import { Earth } from "@/components/globe/Earth";
+import { Starfield } from "@/components/globe/Starfield";
 
 const RealisticGlobe = () => {
   return (
@@ -11,10 +12,14 @@ const RealisticGlobe = () => {
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}
       >
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[6, 3, 6]} intensity={1.35} color="#fff4d6" />
-        <directionalLight position={[-6, -3, -6]} intensity={0.55} color="#7fd8ff" />
-        <pointLight position={[10, 10, 10]} intensity={0.45} />
+        {/* Starfield background */}
+        <Starfield count={1500} />
+
+        <ambientLight intensity={0.25} />
+        {/* Sun light - creates day/night effect */}
+        <directionalLight position={[8, 2, 5]} intensity={1.5} color="#fff4d6" />
+        <directionalLight position={[-6, -3, -6]} intensity={0.35} color="#4a90d9" />
+        <pointLight position={[10, 10, 10]} intensity={0.3} />
 
         <Earth />
 
@@ -22,7 +27,7 @@ const RealisticGlobe = () => {
           enableZoom={false}
           enablePan={false}
           autoRotate
-          autoRotateSpeed={0.35}
+          autoRotateSpeed={0.3}
           minPolarAngle={Math.PI / 3}
           maxPolarAngle={Math.PI / 1.5}
         />

@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import FloatingParticles from "@/components/FloatingParticles";
+import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Plane, Sparkles, Users, Globe, Camera, Ticket, Bot, Smartphone, ChevronDown } from "lucide-react";
+import { Plane, Sparkles, Globe, ChevronDown } from "lucide-react";
 
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
 
@@ -36,75 +37,6 @@ const AnimatedSection = ({
     </div>
   );
 };
-
-const features = [
-  {
-    Icon: Users,
-    emoji: "👥",
-    title: "Social Travel Network",
-    subtitle: "Connect & Explore Together",
-    description: "Connect with fellow travelers, share experiences, and discover trips through our vibrant community. Find travel buddies who match your style and interests.",
-    longDescription: "Join thousands of passionate travelers who share their stories, tips, and adventures. Our community-driven platform helps you find the perfect travel companions, get insider recommendations, and make lifelong connections.",
-    gradient: "from-pink-500 via-rose-500 to-red-500",
-    bgGradient: "from-pink-900/30 via-rose-900/20 to-red-900/30",
-    accent: "pink",
-  },
-  {
-    Icon: Globe,
-    emoji: "🌍",
-    title: "Find Travel Companions",
-    subtitle: "Never Travel Alone",
-    description: "Create or join travel groups for your upcoming trips. Connect with people traveling to the same destination and make your journey more memorable.",
-    longDescription: "Whether you're a solo adventurer seeking company or a group looking for new members, our smart matching system connects you with compatible travelers. Share costs, experiences, and create memories together.",
-    gradient: "from-blue-500 via-cyan-500 to-teal-500",
-    bgGradient: "from-blue-900/30 via-cyan-900/20 to-teal-900/30",
-    accent: "cyan",
-  },
-  {
-    Icon: Camera,
-    emoji: "📸",
-    title: "Share Your Adventures",
-    subtitle: "Inspire & Be Inspired",
-    description: "Post photos, stories, and experiences from your travels. Like, comment, and save posts from fellow travelers to inspire your next adventure.",
-    longDescription: "Turn your travel memories into inspiring stories. Our rich media platform lets you share photos, videos, and detailed trip experiences. Get featured, gain followers, and become a travel influencer.",
-    gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
-    bgGradient: "from-violet-900/30 via-purple-900/20 to-fuchsia-900/30",
-    accent: "purple",
-  },
-  {
-    Icon: Ticket,
-    emoji: "🎫",
-    title: "Unified Booking",
-    subtitle: "All Tickets, One Place",
-    description: "Book flights, trains, and buses from multiple providers in one place. Get digital and QR code tickets for easy access.",
-    longDescription: "Compare prices across hundreds of providers, book seamlessly, and manage all your tickets in one digital wallet. Our smart booking system finds you the best deals and keeps everything organized.",
-    gradient: "from-amber-500 via-orange-500 to-red-500",
-    bgGradient: "from-amber-900/30 via-orange-900/20 to-red-900/30",
-    accent: "orange",
-  },
-  {
-    Icon: Bot,
-    emoji: "🤖",
-    title: "AI Trip Planning",
-    subtitle: "Smart Itineraries",
-    description: "Get personalized itineraries tailored to your preferences with our AI-powered trip planner. Discover destinations, activities, and hidden gems.",
-    longDescription: "Our advanced AI understands your travel style, budget, and interests to create perfect itineraries. From must-see attractions to hidden local gems, get recommendations that match your unique preferences.",
-    gradient: "from-emerald-500 via-green-500 to-lime-500",
-    bgGradient: "from-emerald-900/30 via-green-900/20 to-lime-900/30",
-    accent: "emerald",
-  },
-  {
-    Icon: Smartphone,
-    emoji: "📱",
-    title: "All-in-One Platform",
-    subtitle: "Your Travel Companion",
-    description: "Manage bookings, connect with travelers, and plan trips all in one intuitive dashboard. Access everything you need for your perfect journey.",
-    longDescription: "From planning to booking to exploring, everything you need is in one place. Real-time updates, offline access, and seamless synchronization across all your devices make traveling effortless.",
-    gradient: "from-indigo-500 via-blue-500 to-sky-500",
-    bgGradient: "from-indigo-900/30 via-blue-900/20 to-sky-900/30",
-    accent: "blue",
-  }
-];
 
 const Welcome = () => {
   const navigate = useNavigate();
@@ -240,97 +172,8 @@ const Welcome = () => {
           </div>
         </section>
 
-        {/* Full Page Feature Sections */}
-        <section id="features" className="relative snap-y snap-mandatory">
-          {features.map((feature, idx) => (
-            <div
-              key={idx}
-              className="min-h-screen flex items-center justify-center relative overflow-hidden snap-start"
-            >
-              {/* Background Gradient */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgGradient} opacity-50`} />
-
-              {/* Glossy Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/0 to-foreground/10" />
-
-              {/* Content */}
-              <div className="container mx-auto px-6 py-20 max-w-6xl relative z-10">
-                <div
-                  className={`flex flex-col ${idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"} items-center gap-12 lg:gap-20`}
-                >
-                  {/* Icon Side */}
-                  <AnimatedSection delay={200} className="flex-1 flex justify-center">
-                    <div className="relative">
-                      {/* Glow Effect */}
-                      <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-30 scale-150`} />
-
-                      {/* Icon Container */}
-                      <div
-                        className={`
-                          relative w-48 h-48 md:w-64 md:h-64 rounded-full 
-                          bg-gradient-to-br ${feature.gradient}
-                          flex items-center justify-center
-                          shadow-2xl
-                        `}
-                        style={{
-                          animation: "float 6s ease-in-out infinite",
-                          animationDelay: `${idx * 0.5}s`,
-                        }}
-                      >
-                        {/* Glossy Finish */}
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-background/40 via-background/10 to-transparent" />
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-foreground/15 to-transparent" />
-
-                        {/* Icon */}
-                        <feature.Icon
-                          className="h-20 w-20 md:h-28 md:w-28 text-primary-foreground drop-shadow-2xl relative z-10"
-                          strokeWidth={1.5}
-                        />
-
-                        {/* Emoji Badge */}
-                        <div className="absolute -top-4 -right-4 text-5xl animate-bounce" style={{ animationDelay: `${idx * 0.2}s` }}>
-                          {feature.emoji}
-                        </div>
-                      </div>
-                    </div>
-                  </AnimatedSection>
-
-                  {/* Text Side */}
-                  <AnimatedSection className="flex-1 text-center lg:text-left">
-                    <Badge className={`mb-4 bg-gradient-to-r ${feature.gradient} text-primary-foreground border-0 text-sm px-4 py-1`}>
-                      {feature.subtitle}
-                    </Badge>
-                    <h2
-                      className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}`}
-                    >
-                      {feature.title}
-                    </h2>
-                    <p className="text-xl text-muted-foreground mb-6 leading-relaxed">{feature.description}</p>
-                    <p className="text-lg text-muted-foreground/80 mb-8 leading-relaxed">{feature.longDescription}</p>
-                    <Button
-                      size="lg"
-                      asChild
-                      className={`px-8 py-6 text-lg bg-gradient-to-r ${feature.gradient} border-0 hover:opacity-90 transition-all hover:scale-105 shadow-xl`}
-                    >
-                      <Link to="/signup">
-                        Get Started
-                        <Sparkles className="ml-2 h-5 w-5" />
-                      </Link>
-                    </Button>
-                  </AnimatedSection>
-                </div>
-              </div>
-
-              {/* Decorative Elements */}
-              <div
-                className={`absolute top-20 ${idx % 2 === 0 ? "right-20" : "left-20"} w-32 h-32 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-20`}
-              />
-              <div
-                className={`absolute bottom-20 ${idx % 2 === 0 ? "left-20" : "right-20"} w-48 h-48 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-15`}
-              />
-            </div>
-          ))}
-        </section>
+        {/* Horizontal Scroll Features */}
+        <HorizontalScrollFeatures />
 
         <FeaturedTrips />
 
