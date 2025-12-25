@@ -88,7 +88,7 @@ const HorizontalScrollFeatures = () => {
     const containerHeight = container.offsetHeight;
     const viewportHeight = window.innerHeight;
 
-    // Check if we're in the section
+    // Check if we're in the section (from when top hits viewport top until section ends)
     const inSection = containerTop <= 0 && containerTop > -(containerHeight - viewportHeight);
     setIsInSection(inSection);
 
@@ -112,8 +112,8 @@ const HorizontalScrollFeatures = () => {
     <section 
       id="features" 
       ref={containerRef} 
-      className="relative" 
-      style={{ height: `${features.length * 100}vh`, marginBottom: 0 }}
+      className="relative -mb-px" 
+      style={{ height: `${features.length * 100}vh` }}
     >
       {/* Progress Indicator - Redesigned */}
       <div 
