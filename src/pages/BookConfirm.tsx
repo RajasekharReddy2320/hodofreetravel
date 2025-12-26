@@ -47,10 +47,10 @@ export default function BookConfirm() {
   }
 
   const getPrice = () => {
-    if (bookingType === 'train') {
-      return booking.classes[booking.selectedClass].price;
+    if (bookingType === 'train' && booking.classes && booking.selectedClass) {
+      return booking.classes[booking.selectedClass]?.price || booking.price || 0;
     }
-    return booking.price;
+    return booking.price || 0;
   };
 
   const handleAddToCart = () => {
