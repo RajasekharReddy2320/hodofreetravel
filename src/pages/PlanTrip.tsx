@@ -1,18 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, IndianRupee, MapPin, Sparkles, Users, Zap, Clock, Wallet, Check, ArrowRight, Plane } from "lucide-react";
+import { Calendar, IndianRupee, MapPin, Sparkles, Users, Zap, Clock, Wallet, Check, ArrowRight, Plane, MapPinned, Briefcase, History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardNav from "@/components/DashboardNav";
-import ItineraryCard from "@/components/planner/ItineraryCard";
-import ItineraryMap from "@/components/planner/ItineraryMap";
-import PlannerCart from "@/components/planner/PlannerCart";
-import { ItineraryStep, CartItem } from "@/types/tripPlanner";
 import { useCart } from "@/contexts/CartContext";
 
 const INTEREST_OPTIONS = [
@@ -20,7 +17,25 @@ const INTEREST_OPTIONS = [
   "Beach", "Shopping", "Nightlife", "Museums", "Photography"
 ];
 
+type TripType = 'tourism' | 'commute';
 type PlannerMode = 'comfort' | 'time' | 'budget';
+
+const TRIP_TYPES = [
+  {
+    value: 'tourism' as TripType,
+    icon: MapPinned,
+    title: 'Tourism',
+    description: 'Sightseeing, points of interest & leisure travel',
+    color: 'text-emerald-500'
+  },
+  {
+    value: 'commute' as TripType,
+    icon: Briefcase,
+    title: 'General/Commute',
+    description: 'Point A to B logistics, meetings, efficient travel',
+    color: 'text-blue-500'
+  }
+];
 
 const PLANNER_MODES = [
   {
@@ -46,13 +61,15 @@ const PLANNER_MODES = [
   }
 ];
 
-interface GeneratedItinerary {
+interface SavedItinerary {
   id: string;
   title: string;
-  subtitle: string;
-  reason: string;
-  estimatedTotalCost: number;
-  steps: ItineraryStep[];
+  destination: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  planner_mode: string | null;
+  trip_type: string;
 }
 
 export default function PlanTrip() {
@@ -61,6 +78,7 @@ export default function PlanTrip() {
   const { addToCart: addToGlobalCart } = useCart();
   
   const [loading, setLoading] = useState(false);
+  const [tripType, setTripType] = useState<TripType>('tourism');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('comfort');
   const [currentLocation, setCurrentLocation] = useState("");
   const [destination, setDestination] = useState("");
@@ -69,12 +87,76 @@ export default function PlanTrip() {
   const [budgetINR, setBudgetINR] = useState("");
   const [groupSize, setGroupSize] = useState("2");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [detectingLocation, setDetectingLocation] = useState(false);
   
-  const [itineraries, setItineraries] = useState<GeneratedItinerary[]>([]);
-  const [selectedItinerary, setSelectedItinerary] = useState<GeneratedItinerary | null>(null);
-  
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  // Itinerary history
+  const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    loadItineraryHistory();
+  }, []);
+
+  const loadItineraryHistory = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoadingHistory(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, title, destination, start_date, end_date, created_at, planner_mode, trip_type")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (!error && data) {
+      setSavedItineraries(data as SavedItinerary[]);
+    }
+    setLoadingHistory(false);
+  };
+
+  const deleteItinerary = async (id: string) => {
+    const { error } = await supabase.from("trips").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete itinerary", variant: "destructive" });
+      return;
+    }
+    setSavedItineraries(prev => prev.filter(it => it.id !== id));
+    toast({ title: "Deleted", description: "Itinerary removed" });
+  };
+
+  const detectLocation = () => {
+    setDetectingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            // Use reverse geocoding to get city name
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${position.coords.latitude}&lon=${position.coords.longitude}&format=json`
+            );
+            const data = await response.json();
+            const city = data.address?.city || data.address?.town || data.address?.village || data.address?.state || "Your Location";
+            setCurrentLocation(city);
+            toast({ title: "Location Detected", description: `Origin set to ${city}` });
+          } catch {
+            setCurrentLocation("Current Location");
+            toast({ title: "Location Detected", description: "Using approximate location" });
+          }
+          setDetectingLocation(false);
+        },
+        () => {
+          toast({ title: "Location Error", description: "Could not detect location", variant: "destructive" });
+          setDetectingLocation(false);
+        }
+      );
+    } else {
+      toast({ title: "Not Supported", description: "Geolocation not available", variant: "destructive" });
+      setDetectingLocation(false);
+    }
+  };
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev =>
@@ -85,18 +167,25 @@ export default function PlanTrip() {
   };
 
   const handleGenerate = async () => {
-    if (!destination || !startDate || !endDate || selectedInterests.length === 0) {
+    if (!destination || !startDate || !endDate) {
       toast({
         title: "Missing Information",
-        description: "Please fill destination, dates, and select at least one interest.",
+        description: "Please fill destination and dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (tripType === 'tourism' && selectedInterests.length === 0) {
+      toast({
+        title: "Missing Interests",
+        description: "Please select at least one interest for tourism trips.",
         variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
-    setItineraries([]);
-    setSelectedItinerary(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-itinerary', {
@@ -107,9 +196,11 @@ export default function PlanTrip() {
           endDate,
           budgetINR: budgetINR ? parseFloat(budgetINR) : null,
           groupSize: parseInt(groupSize),
-          interests: selectedInterests,
+          interests: tripType === 'commute' ? ['efficient', 'transport'] : selectedInterests,
           plannerMode,
-          generateMultiple: true
+          tripType,
+          generateMultiple: !budgetINR, // Generate 4 options if no budget specified
+          generateBudgetOptions: !budgetINR // Flag to generate min-to-max budget options
         }
       });
 
@@ -120,12 +211,12 @@ export default function PlanTrip() {
       }
 
       if (data.itineraries && data.itineraries.length > 0) {
-        // Navigate to the Generated Itineraries page
         navigate('/generated-itineraries', {
           state: {
             itineraries: data.itineraries,
             currentLocation,
-            destination
+            destination,
+            tripType
           }
         });
       } else {
@@ -143,98 +234,63 @@ export default function PlanTrip() {
     }
   };
 
-  const handleSelectItinerary = (itinerary: GeneratedItinerary) => {
-    setSelectedItinerary(itinerary);
-    setCartItems([]);
-    toast({
-      title: `Selected: ${itinerary.title}`,
-      description: "Scroll down to view your detailed itinerary.",
-    });
-  };
-
-  const handleAddToCart = (step: ItineraryStep) => {
-    if (!cartItems.some(item => item.id === step.id)) {
-      setCartItems(prev => [...prev, { ...step, addedAt: Date.now() }]);
-      setIsCartOpen(true);
-      toast({
-        title: "Added to Cart",
-        description: step.title,
-      });
-    }
-  };
-
-  const handleRemoveFromCart = (id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const handleProceedToCheckout = () => {
-    cartItems.forEach(item => {
-      addToGlobalCart({
-        id: item.id,
-        booking_type: item.category === 'transport' ? 'flight' : 'bus',
-        service_name: item.title,
-        service_number: `PLN-${item.id.slice(0, 6).toUpperCase()}`,
-        from_location: currentLocation || 'Origin',
-        to_location: item.location,
-        departure_date: new Date().toISOString().split('T')[0],
-        departure_time: item.time,
-        arrival_time: item.time,
-        duration: item.duration || '1h',
-        price_inr: item.estimatedCost || 0,
-        passenger_name: '',
-        passenger_email: '',
-        passenger_phone: '',
-      });
-    });
-    navigate('/cart');
-  };
-
-  const handleSaveTrip = async () => {
-    if (!selectedItinerary) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("trips")
-      .insert([{
-        user_id: user.id,
-        title: `${destination} - ${selectedItinerary.title}`,
-        destination,
-        start_date: startDate,
-        end_date: endDate,
-        trip_type: 'ai',
-        planner_mode: plannerMode,
-        budget_inr: budgetINR ? parseFloat(budgetINR) : null,
-        group_size: parseInt(groupSize),
-        interests: selectedInterests,
-        itinerary: selectedItinerary as any
-      }]);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save trip",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    toast({
-      title: "Trip Saved!",
-      description: "Your trip has been saved to your profile."
-    });
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
       
       <main className="container mx-auto px-4 py-8 pb-32">
         <div className="max-w-5xl mx-auto">
+          {/* Itinerary History Section */}
+          {savedItineraries.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <History className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Recent Itineraries</h2>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-3 pb-4">
+                  {savedItineraries.map((itinerary) => (
+                    <Card 
+                      key={itinerary.id} 
+                      className="min-w-[280px] hover:shadow-md transition-shadow cursor-pointer group relative"
+                      onClick={() => navigate('/generated-itineraries', { state: { viewTripId: itinerary.id } })}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-sm truncate max-w-[200px]">{itinerary.title}</p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3" />
+                              {itinerary.destination}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(itinerary.start_date).toLocaleDateString()} - {new Date(itinerary.end_date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItinerary(itinerary.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                        <Badge variant="outline" className="mt-2 text-xs">
+                          {itinerary.trip_type === 'ai' ? 'AI Generated' : itinerary.trip_type}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          )}
+
           {/* Header */}
           <div className="mb-8 text-center">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-medium mb-4">
@@ -248,37 +304,70 @@ export default function PlanTrip() {
               </span>
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Get 4 unique AI-curated itineraries tailored to your style. Pick your favorite and start booking!
+              {!budgetINR 
+                ? "Get 4 unique AI-curated itineraries ranging from budget to luxury. No budget? We'll show you all options!"
+                : "Get AI-curated itineraries tailored to your style and budget."
+              }
             </p>
           </div>
 
-          {/* Planner Mode Selection */}
-          <div className="mb-8">
-            <Label className="text-sm font-semibold mb-3 block text-center">Planning Style</Label>
-            <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
-              {PLANNER_MODES.map((mode) => {
-                const Icon = mode.icon;
-                const isActive = plannerMode === mode.value;
+          {/* Trip Type Selection */}
+          <div className="mb-6">
+            <Label className="text-sm font-semibold mb-3 block text-center">Trip Type</Label>
+            <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
+              {TRIP_TYPES.map((type) => {
+                const Icon = type.icon;
+                const isActive = tripType === type.value;
                 
                 return (
                   <button
-                    key={mode.value}
+                    key={type.value}
                     type="button"
                     className={`p-4 rounded-xl border-2 transition-all text-center ${
                       isActive 
                         ? 'border-primary bg-primary/5 shadow-md' 
                         : 'border-border hover:border-primary/50 bg-card'
                     }`}
-                    onClick={() => setPlannerMode(mode.value)}
+                    onClick={() => setTripType(type.value)}
                   >
-                    <Icon className={`h-6 w-6 mx-auto mb-2 ${isActive ? mode.color : 'text-muted-foreground'}`} />
-                    <p className="font-semibold text-sm">{mode.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 hidden sm:block">{mode.description}</p>
+                    <Icon className={`h-6 w-6 mx-auto mb-2 ${isActive ? type.color : 'text-muted-foreground'}`} />
+                    <p className="font-semibold text-sm">{type.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1 hidden sm:block">{type.description}</p>
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* Planner Mode Selection (Only for Tourism) */}
+          {tripType === 'tourism' && (
+            <div className="mb-8">
+              <Label className="text-sm font-semibold mb-3 block text-center">Planning Style</Label>
+              <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+                {PLANNER_MODES.map((mode) => {
+                  const Icon = mode.icon;
+                  const isActive = plannerMode === mode.value;
+                  
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      className={`p-4 rounded-xl border-2 transition-all text-center ${
+                        isActive 
+                          ? 'border-primary bg-primary/5 shadow-md' 
+                          : 'border-border hover:border-primary/50 bg-card'
+                      }`}
+                      onClick={() => setPlannerMode(mode.value)}
+                    >
+                      <Icon className={`h-6 w-6 mx-auto mb-2 ${isActive ? mode.color : 'text-muted-foreground'}`} />
+                      <p className="font-semibold text-sm">{mode.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 hidden sm:block">{mode.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Input Form */}
           <Card className="mb-8 shadow-lg border-2">
@@ -287,6 +376,12 @@ export default function PlanTrip() {
                 <Plane className="text-primary" size={20} />
                 Trip Details
               </CardTitle>
+              <CardDescription>
+                {tripType === 'commute' 
+                  ? "Enter your origin and destination for efficient multimodal routing"
+                  : "Tell us about your dream destination"
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {/* Locations */}
@@ -294,14 +389,32 @@ export default function PlanTrip() {
                 <div>
                   <Label htmlFor="currentLocation" className="flex items-center gap-2 mb-2">
                     <MapPin size={14} className="text-primary" />
-                    Departure City (Optional)
+                    {tripType === 'commute' ? 'Origin *' : 'Departure City'}
                   </Label>
-                  <Input
-                    id="currentLocation"
-                    placeholder="e.g., Mumbai, India"
-                    value={currentLocation}
-                    onChange={(e) => setCurrentLocation(e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="currentLocation"
+                      placeholder="e.g., Mumbai, India"
+                      value={currentLocation}
+                      onChange={(e) => setCurrentLocation(e.target.value)}
+                      required={tripType === 'commute'}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="icon"
+                      onClick={detectLocation}
+                      disabled={detectingLocation}
+                      title="Detect my location"
+                    >
+                      {detectingLocation ? (
+                        <Zap className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MapPinned className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="destination" className="flex items-center gap-2 mb-2">
@@ -354,11 +467,12 @@ export default function PlanTrip() {
                   <Label htmlFor="budgetINR" className="flex items-center gap-2 mb-2">
                     <IndianRupee size={14} className="text-primary" />
                     Budget (INR)
+                    <span className="text-xs text-muted-foreground ml-1">(optional - leave empty for 4 options)</span>
                   </Label>
                   <Input
                     id="budgetINR"
                     type="number"
-                    placeholder="50000"
+                    placeholder="Leave empty for min-to-max options"
                     value={budgetINR}
                     onChange={(e) => setBudgetINR(e.target.value)}
                   />
@@ -378,23 +492,25 @@ export default function PlanTrip() {
                 </div>
               </div>
 
-              {/* Interests */}
-              <div>
-                <Label className="mb-3 block">Interests *</Label>
-                <div className="flex flex-wrap gap-2">
-                  {INTEREST_OPTIONS.map((interest) => (
-                    <Badge
-                      key={interest}
-                      variant={selectedInterests.includes(interest) ? "default" : "outline"}
-                      className="cursor-pointer transition-all hover:scale-105 py-1.5 px-3"
-                      onClick={() => toggleInterest(interest)}
-                    >
-                      {selectedInterests.includes(interest) && <Check size={12} className="mr-1" />}
-                      {interest}
-                    </Badge>
-                  ))}
+              {/* Interests (Only for Tourism) */}
+              {tripType === 'tourism' && (
+                <div>
+                  <Label className="mb-3 block">Interests *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {INTEREST_OPTIONS.map((interest) => (
+                      <Badge
+                        key={interest}
+                        variant={selectedInterests.includes(interest) ? "default" : "outline"}
+                        className="cursor-pointer transition-all hover:scale-105 py-1.5 px-3"
+                        onClick={() => toggleInterest(interest)}
+                      >
+                        {selectedInterests.includes(interest) && <Check size={12} className="mr-1" />}
+                        {interest}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Generate Button */}
               <Button
@@ -406,129 +522,25 @@ export default function PlanTrip() {
                 {loading ? (
                   <>
                     <Zap className="mr-2 h-5 w-5 animate-spin" />
-                    Generating 4 Itineraries...
+                    {!budgetINR ? "Generating 4 Budget Options..." : "Generating Itinerary..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-5 w-5" />
-                    Generate 4 Itinerary Options
+                    {!budgetINR ? "Generate 4 Budget Options (Min to Luxury)" : "Generate Itinerary"}
                   </>
                 )}
               </Button>
+
+              {!budgetINR && (
+                <p className="text-center text-sm text-muted-foreground">
+                  Without a budget, we'll generate: <span className="font-medium">Minimum Cost</span> → <span className="font-medium">Economy</span> → <span className="font-medium">Standard</span> → <span className="font-medium">Luxury</span>
+                </p>
+              )}
             </CardContent>
           </Card>
-
-          {/* Itinerary Selection Cards */}
-          {itineraries.length > 0 && !selectedItinerary && (
-            <div className="animate-fade-in">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold mb-2">Choose Your Adventure</h2>
-                <p className="text-muted-foreground">We've created {itineraries.length} unique itineraries for you. Pick your favorite!</p>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                {itineraries.map((itinerary, index) => (
-                  <Card 
-                    key={itinerary.id || index}
-                    className={`cursor-pointer transition-all hover:shadow-xl hover:border-primary/50 border-2 group`}
-                    onClick={() => handleSelectItinerary(itinerary)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <Badge variant="secondary" className="mb-2 text-xs">Option {index + 1}</Badge>
-                          <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                            {itinerary.title}
-                          </CardTitle>
-                          <CardDescription className="mt-1">{itinerary.subtitle}</CardDescription>
-                        </div>
-                        <ArrowRight className="text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" size={20} />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">{itinerary.reason}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{itinerary.steps?.length || 0} activities</span>
-                        <span className="font-bold text-primary">
-                          ₹{(itinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Selected Itinerary Detail View */}
-          {selectedItinerary && (
-            <div className="animate-fade-in">
-              {/* Header */}
-              <div className="text-center mb-8">
-                <Button 
-                  variant="ghost" 
-                  className="mb-4"
-                  onClick={() => setSelectedItinerary(null)}
-                >
-                  ← Back to all options
-                </Button>
-                <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-1.5 rounded-full text-sm font-bold mb-4">
-                  <Sparkles size={14} />
-                  {selectedItinerary.subtitle}
-                </div>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                  {selectedItinerary.title}
-                </h2>
-                <p className="text-muted-foreground mb-4">{selectedItinerary.reason}</p>
-                <div className="flex items-center justify-center gap-4 flex-wrap">
-                  <Badge variant="outline" className="text-lg py-1 px-4">
-                    Est. ₹{(selectedItinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}
-                  </Badge>
-                  <Button onClick={handleSaveTrip} variant="secondary">
-                    Save Trip
-                  </Button>
-                </div>
-              </div>
-
-              {/* Map */}
-              {selectedItinerary.steps && selectedItinerary.steps.length > 0 && (
-                <ItineraryMap steps={selectedItinerary.steps} />
-              )}
-
-              {/* Timeline */}
-              <div className="relative">
-                <div className="absolute left-[50%] top-0 bottom-0 w-px bg-border hidden md:block -z-10 transform -translate-x-1/2"></div>
-                
-                <div className="space-y-6">
-                  {selectedItinerary.steps?.map((step) => (
-                    <ItineraryCard
-                      key={step.id}
-                      step={step}
-                      onAdd={handleAddToCart}
-                      isAdded={cartItems.some(item => item.id === step.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* End marker */}
-              <div className="text-center mt-16 pb-10">
-                <p className="text-muted-foreground text-sm">End of Itinerary</p>
-                <div className="w-2 h-2 bg-muted-foreground/50 rounded-full mx-auto mt-2"></div>
-              </div>
-            </div>
-          )}
         </div>
       </main>
-
-      {/* Cart */}
-      <PlannerCart
-        items={cartItems}
-        onRemove={handleRemoveFromCart}
-        isOpen={isCartOpen}
-        setIsOpen={setIsCartOpen}
-        currentLocation={currentLocation}
-      />
     </div>
   );
 }

@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Security: Input validation schema
 const itineraryRequestSchema = z.object({
   currentLocation: z.string().trim().min(2).max(100).optional(),
   destination: z.string().trim().min(2).max(100),
@@ -19,8 +18,9 @@ const itineraryRequestSchema = z.object({
   travelers: z.number().int().min(1).max(50).optional(),
   interests: z.array(z.string().max(50)).max(20),
   plannerMode: z.enum(['comfort', 'time', 'budget']).optional(),
-  aiModel: z.enum(['gemini', 'gpt5', 'gpt5-mini']).optional(),
-  generateMultiple: z.boolean().optional()
+  tripType: z.enum(['tourism', 'commute']).optional(),
+  generateMultiple: z.boolean().optional(),
+  generateBudgetOptions: z.boolean().optional()
 });
 
 serve(async (req) => {
@@ -31,7 +31,6 @@ serve(async (req) => {
   try {
     const requestData = await req.json();
     
-    // Security: Validate inputs
     const validation = itineraryRequestSchema.safeParse(requestData);
     if (!validation.success) {
       return new Response(
@@ -53,15 +52,15 @@ serve(async (req) => {
       groupSize, 
       travelers,
       interests, 
-      plannerMode, 
-      aiModel = 'gemini',
-      generateMultiple = true
+      plannerMode = 'comfort',
+      tripType = 'tourism',
+      generateMultiple = true,
+      generateBudgetOptions = false
     } = validation.data;
     
     const actualGroupSize = groupSize || travelers || 1;
-    const actualBudget = budget || (budgetINR ? `₹${budgetINR}` : 'Flexible');
+    const actualBudget = budget || (budgetINR ? `₹${budgetINR}` : null);
     
-    // Security: Validate date logic
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end <= start) {
@@ -81,8 +80,9 @@ serve(async (req) => {
 
     console.log('[Itinerary Request]', {
       destination,
+      tripType,
       duration_days: tripDays,
-      generateMultiple,
+      generateBudgetOptions,
       timestamp: new Date().toISOString()
     });
 
@@ -96,7 +96,6 @@ serve(async (req) => {
       );
     }
 
-    // Construct system prompt based on planner mode
     let modeDescription = "balanced";
     if (plannerMode === 'comfort') {
       modeDescription = "comfort-focused with premium experiences, luxury stays, and relaxation";
@@ -110,25 +109,93 @@ serve(async (req) => {
 Return ONLY valid JSON with no additional text. The response must be a valid JSON object.
 All costs should be in INR (Indian Rupees).`;
 
-    const itineraryCount = generateMultiple ? 4 : 1;
-    
-    const userPrompt = `Create ${itineraryCount} DIFFERENT trip itinerary options for ${actualGroupSize} traveler(s) ${currentLocation ? `traveling from ${currentLocation} to ` : 'visiting '}${destination}.
+    let userPrompt = '';
+
+    if (tripType === 'commute') {
+      // Commute mode: Focus on multimodal transport logistics
+      userPrompt = `Create a multimodal travel plan for ${actualGroupSize} traveler(s) from ${currentLocation || 'Origin'} to ${destination}.
+
+Trip Details:
+- Origin: ${currentLocation || 'Not specified'}
+- Destination: ${destination}
+- Travel Date: ${startDate}
+- Return Date: ${endDate}
+- Budget: ${actualBudget || 'Flexible - provide multiple options'}
+
+This is a COMMUTE/GENERAL trip, NOT tourism. Focus ONLY on:
+1. The most efficient way to get from Point A to Point B
+2. Consider multimodal options: flights, trains, buses, and interconnections
+3. If direct flights are unavailable, calculate complex routes (e.g., flight to nearest airport → train to city → bus to final destination)
+4. Include waiting times, transfer logistics, and total journey duration
+
+${!actualBudget ? `Since no budget was specified, generate 4 DISTINCT transport options:
+1. "Minimum Cost" - Cheapest possible route (may involve more transfers/time)
+2. "Economy" - Good balance of cost and comfort
+3. "Standard" - Comfortable travel with reasonable speed
+4. "Maximum Comfort" - Fastest/most luxurious options available
+
+Each option should have genuinely different routes and transport modes.` : 'Generate the optimal route within the specified budget.'}
+
+Return a JSON object with this structure:
+{
+  "itineraries": [
+    {
+      "id": "unique-id",
+      "title": "Route Name (e.g., 'Budget Route via Train')",
+      "subtitle": "Brief description",
+      "reason": "Why choose this route (1-2 sentences)",
+      "estimatedTotalCost": 5000,
+      "totalDuration": "12 hours",
+      "steps": [
+        {
+          "id": "step-id",
+          "day": 1,
+          "time": "06:00",
+          "title": "Flight/Train/Bus Name",
+          "description": "Departure and arrival details",
+          "location": "Station/Airport name",
+          "duration": "3 hours",
+          "category": "transport",
+          "transportType": "flight|train|bus|metro|taxi",
+          "isBookable": true,
+          "estimatedCost": 3000,
+          "fromStation": "Mumbai Central",
+          "toStation": "Ahmedabad Junction"
+        }
+      ]
+    }
+  ]
+}
+
+Include realistic Indian transport options (Indian Railways, IndiGo, SpiceJet, RedBus operators, etc.).`;
+
+    } else {
+      // Tourism mode: Standard sightseeing itinerary
+      const itineraryCount = generateBudgetOptions ? 4 : (generateMultiple ? 4 : 1);
+      
+      userPrompt = `Create ${itineraryCount} DIFFERENT trip itinerary options for ${actualGroupSize} traveler(s) ${currentLocation ? `traveling from ${currentLocation} to ` : 'visiting '}${destination}.
 
 Trip Details:
 - ${currentLocation ? `Departure: ${currentLocation}` : 'No departure city specified'}
 - Destination: ${destination}
 - Dates: ${startDate} to ${endDate} (${tripDays} days)
-- Budget: ${actualBudget}
+- Budget: ${actualBudget || 'Not specified - generate options from minimum to luxury'}
 - Interests: ${interests.join(", ")}
 - Planning Style: ${modeDescription}
 
-${itineraryCount > 1 ? `Generate ${itineraryCount} DISTINCT itinerary options with different themes:
+${generateBudgetOptions && !actualBudget ? `Since no budget was provided, generate 4 DISTINCT itineraries with different budget levels:
+1. "Minimum Cost" - Backpacker style, hostels, street food, free attractions (~₹15,000-25,000)
+2. "Economy" - Budget hotels, local restaurants, mix of paid/free activities (~₹30,000-50,000)
+3. "Standard" - 3-star hotels, good restaurants, popular attractions (~₹60,000-90,000)
+4. "Luxury" - Premium hotels, fine dining, exclusive experiences (~₹1,20,000+)
+
+Each budget tier should have genuinely different experiences and accommodations.` : `Generate ${itineraryCount} DISTINCT itinerary options with different themes:
 1. "Classic Explorer" - Popular attractions and must-see spots
 2. "Hidden Gems" - Off-the-beaten-path experiences and local secrets
 3. "Adventure Seeker" - Active and adventurous activities
 4. "Relaxed Retreat" - Leisurely pace with comfort focus
 
-Each itinerary should feel genuinely different, not just reordered activities.` : 'Generate one comprehensive itinerary.'}
+Each itinerary should feel genuinely different, not just reordered activities.`}
 
 ${currentLocation ? `IMPORTANT: Include transport from ${currentLocation} to ${destination} as the first step and return transport as the last step.` : ''}
 
@@ -141,6 +208,7 @@ Return a JSON object with this structure:
       "subtitle": "Brief tagline",
       "reason": "Why this itinerary is great (1-2 sentences)",
       "estimatedTotalCost": 50000,
+      "budgetTier": "economy",
       "steps": [
         {
           "id": "step-unique-id",
@@ -162,6 +230,7 @@ Return a JSON object with this structure:
 Categories must be: transport, accommodation, activity, food, sightseeing
 Include 4-6 steps per day with realistic INR costs.
 Each step must have a unique id (use format: itinerary-index-day-step, e.g., "1-d1-s1").`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -211,7 +280,6 @@ Each step must have a unique id (use format: itinerary-index-day-step, e.g., "1-
     
     let content = data.choices[0].message.content;
     
-    // Clean up the response - remove any markdown formatting
     content = content.trim();
     if (content.includes('```json')) {
       content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
@@ -221,10 +289,8 @@ Each step must have a unique id (use format: itinerary-index-day-step, e.g., "1-
     }
     content = content.trim();
     
-    // Parse to validate JSON
     const parsedResponse = JSON.parse(content);
     
-    // Validate the structure
     if (!parsedResponse.itineraries || !Array.isArray(parsedResponse.itineraries)) {
       throw new Error('Invalid itinerary format: missing itineraries array');
     }
