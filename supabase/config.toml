@@ -1,1 +1,19 @@
 project_id = "eyggboqhbxvjehozirnq"
+
+[functions.generate-itinerary]
+verify_jwt = false
+
+[functions.generate-trip-plan]
+verify_jwt = false
+
+[functions.search-trains]
+verify_jwt = false
+
+[functions.search-buses]
+verify_jwt = false
+
+[functions.search-flights]
+verify_jwt = false
+
+[functions.create-booking]
+verify_jwt = false
