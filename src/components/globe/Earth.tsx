@@ -32,9 +32,10 @@ export function Earth() {
   }, [dayMap, normalMap, specMap, cloudsMap, lightsMap]);
 
   useFrame((_, delta) => {
-    const step = delta * 0.18;
+    // Slow, calm rotation
+    const step = delta * 0.06;
     if (earthRef.current) earthRef.current.rotation.y += step;
-    if (cloudsRef.current) cloudsRef.current.rotation.y += step * 1.25;
+    if (cloudsRef.current) cloudsRef.current.rotation.y += step * 1.15;
     if (lightsRef.current) lightsRef.current.rotation.y += step;
   });
 

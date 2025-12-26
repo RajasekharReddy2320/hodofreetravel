@@ -147,18 +147,10 @@ const Welcome = () => {
                     </Suspense>
                   </div>
 
-                  {/* Orbiting Planes - Both clockwise with pointy side forward */}
-                  <div className="absolute inset-0 animate-spin" style={{ animationDuration: '20s' }}>
-                    <Plane className="absolute -top-6 left-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(90deg)' }} />
-                  </div>
-                  <div className="absolute inset-0 animate-spin" style={{ animationDuration: '15s' }}>
-                    <Plane className="absolute -bottom-6 left-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'translateX(-50%) rotate(-90deg)' }} />
-                  </div>
-
                   {/* Travel the World Text */}
                   <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <p className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500">
-                      ✈️ Travel the World ✈️
+                      Travel the World
                     </p>
                   </div>
                 </div>
