@@ -1,8 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
-  Ticket, 
-  BookOpen, 
   Search, 
   CalendarDays, 
   FileWarning, 
@@ -27,25 +25,13 @@ export const TrainServicesGrid = () => {
       icon: TrainIcon,
       label: "Book Train",
       color: "text-purple-600 bg-purple-100",
-      route: "/book-transport"
-    },
-    {
-      icon: BookOpen,
-      label: "My Bookings",
-      color: "text-green-600 bg-green-100",
-      route: "/my-tickets"
+      route: "/book-transport?section=trains&action=search"
     },
     {
       icon: Search,
       label: "PNR Enquiry",
       color: "text-blue-600 bg-blue-100",
       route: "/trains/pnr-enquiry"
-    },
-    {
-      icon: CalendarDays,
-      label: "Upcoming Journey",
-      color: "text-orange-600 bg-orange-100",
-      route: "/my-tickets"
     },
     {
       icon: FileWarning,
@@ -71,16 +57,10 @@ export const TrainServicesGrid = () => {
       color: "text-red-500 bg-red-100",
       route: "/trains/track-train"
     },
-    {
-      icon: Ticket,
-      label: "My Tickets",
-      color: "text-indigo-600 bg-indigo-100",
-      route: "/my-tickets"
-    },
   ];
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-6">
+    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
       {services.map((service, idx) => {
         const Icon = service.icon;
         return (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardNav from "@/components/DashboardNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +44,10 @@ interface UpcomingBooking {
 
 export default function BookingHub() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<BookingSection>('flights');
+  const [showSearchForm, setShowSearchForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [upcomingTicket, setUpcomingTicket] = useState<UpcomingBooking | null>(null);
   const [showUpcomingDialog, setShowUpcomingDialog] = useState(false);
@@ -65,6 +67,19 @@ export default function BookingHub() {
   const [flights, setFlights] = useState<any[]>([]);
   const [trains, setTrains] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
+
+  // Check URL params for section and action
+  useEffect(() => {
+    const section = searchParams.get('section') as BookingSection;
+    const action = searchParams.get('action');
+    
+    if (section && SECTIONS.some(s => s.id === section)) {
+      setActiveSection(section);
+    }
+    if (action === 'search') {
+      setShowSearchForm(true);
+    }
+  }, [searchParams]);
 
   // Check for upcoming journeys within 4 hours on page load
   useEffect(() => {
@@ -209,6 +224,15 @@ export default function BookingHub() {
     </Card>
   );
 
+  const handleSectionChange = (section: BookingSection) => {
+    setActiveSection(section);
+    setShowSearchForm(false);
+    // Clear results when switching sections
+    setFlights([]);
+    setTrains([]);
+    setBuses([]);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
@@ -278,7 +302,7 @@ export default function BookingHub() {
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveSection(id)}
+                onClick={() => handleSectionChange(id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   activeSection === id 
                     ? 'bg-background shadow-md text-foreground' 
@@ -293,10 +317,16 @@ export default function BookingHub() {
         </div>
 
         {/* Train Services Grid for Trains tab */}
-        {activeSection === 'trains' && <TrainServicesGrid />}
+        {activeSection === 'trains' && !showSearchForm && <TrainServicesGrid />}
 
-        {/* Search Form - Not for Metro */}
-        {activeSection !== 'metro' && activeSection !== 'buses' && (
+        {/* Coming Soon sections */}
+        {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
+        {activeSection === 'buses' && renderComingSoon('Buses', '🚌')}
+        {activeSection === 'hotels' && renderComingSoon('Hotels', '🏨')}
+        {activeSection === 'cabs' && renderComingSoon('Cabs', '🚕')}
+
+        {/* Search Form - Only for flights or trains when search is active */}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && (
           <Card className="mb-8 border-2 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b">
               <CardTitle className="flex items-center gap-2">
@@ -310,90 +340,35 @@ export default function BookingHub() {
               <CardDescription>Enter your travel details to find the best options</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              {activeSection === 'hotels' ? (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="md:col-span-1">
-                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
-                    <Input placeholder="City or Hotel name" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-in</Label>
-                    <Input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-out</Label>
-                    <Input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Rooms</Label>
-                    <Input type="number" min="1" value={rooms} onChange={(e) => setRooms(e.target.value)} />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={handleSearch} disabled={loading} className="w-full">
-                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                    </Button>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Origin</Label>
+                  <Input placeholder="From city" value={origin} onChange={(e) => setOrigin(e.target.value)} />
                 </div>
-              ) : activeSection === 'cabs' ? (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Pickup Location</Label>
-                    <Input placeholder="Enter pickup point" value={origin} onChange={(e) => setOrigin(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Drop Location</Label>
-                    <Input placeholder="Enter destination" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Date</Label>
-                    <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Clock size={14} /> Time</Label>
-                    <Input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={handleSearch} disabled={loading} className="w-full">
-                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                    </Button>
-                  </div>
+                <div>
+                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
+                  <Input placeholder="To city" value={destination} onChange={(e) => setDestination(e.target.value)} />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Origin</Label>
-                    <Input placeholder="From city" value={origin} onChange={(e) => setOrigin(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
-                    <Input placeholder="To city" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Departure Date</Label>
-                    <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Passengers</Label>
-                    <Input type="number" min="1" max="9" value={passengers} onChange={(e) => setPassengers(e.target.value)} />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={handleSearch} disabled={loading} className="w-full">
-                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                    </Button>
-                  </div>
+                <div>
+                  <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Departure Date</Label>
+                  <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
                 </div>
-              )}
+                <div>
+                  <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Passengers</Label>
+                  <Input type="number" min="1" max="9" value={passengers} onChange={(e) => setPassengers(e.target.value)} />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleSearch} disabled={loading} className="w-full">
+                    <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {/* Results */}
-        {(activeSection === 'flights' || activeSection === 'trains') && renderResults()}
-        
-        {activeSection === 'buses' && renderComingSoon('Bus', '🚌')}
-        {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
-        {activeSection === 'hotels' && renderComingSoon('Hotel', '🏨')}
-        {activeSection === 'cabs' && renderComingSoon('Cab', '🚕')}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && renderResults()}
       </main>
     </div>
   );
