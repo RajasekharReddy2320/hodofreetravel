@@ -139,8 +139,8 @@ export const GroupChat = ({ groupId, groupTitle, fromLocation, toLocation, trave
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[600px] h-[600px] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] h-[600px] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
             <div className="flex items-center justify-between">
               <DialogTitle>{groupTitle} - Group Chat</DialogTitle>
               <Button
@@ -155,65 +155,75 @@ export const GroupChat = ({ groupId, groupTitle, fromLocation, toLocation, trave
             </div>
           </DialogHeader>
         
-        <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
-          <div className="space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No messages yet. Start the conversation!
-              </div>
-            ) : (
-              messages.map((message) => {
-                const isOwnMessage = message.user_id === currentUserId;
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={message.profiles.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(message.profiles.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={`flex-1 ${isOwnMessage ? "text-right" : ""}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">
-                          {isOwnMessage ? "You" : message.profiles.full_name || "Unknown"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(message.created_at), "HH:mm")}
-                        </span>
-                      </div>
-                      <div
-                        className={`inline-block p-3 rounded-lg ${
-                          isOwnMessage
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {message.content}
-                        </p>
+          {/* Custom styled chat area with grey background */}
+          <ScrollArea 
+            className="flex-1 px-4" 
+            ref={scrollRef}
+            style={{ backgroundColor: '#808080' }}
+          >
+            <div className="space-y-4 py-4">
+              {messages.length === 0 ? (
+                <div className="text-center py-8 text-white/70">
+                  No messages yet. Start the conversation!
+                </div>
+              ) : (
+                messages.map((message) => {
+                  const isOwnMessage = message.user_id === currentUserId;
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-white/20">
+                        <AvatarImage src={message.profiles.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs bg-white/20 text-white">
+                          {getInitials(message.profiles.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className={`flex-1 ${isOwnMessage ? "text-right" : ""}`}>
+                        <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? "justify-end" : ""}`}>
+                          <span className="text-sm font-medium text-white" style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}>
+                            {isOwnMessage ? "You" : message.profiles.full_name || "Unknown"}
+                          </span>
+                          <span className="text-xs text-white/60">
+                            {format(new Date(message.created_at), "HH:mm")}
+                          </span>
+                        </div>
+                        <div
+                          className={`inline-block p-3 rounded-2xl max-w-[80%] ${
+                            isOwnMessage
+                              ? "bg-primary text-primary-foreground rounded-tr-sm"
+                              : "bg-white/20 text-white rounded-tl-sm"
+                          }`}
+                        >
+                          <p 
+                            className="text-sm whitespace-pre-wrap break-words"
+                            style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
+                          >
+                            {message.content}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </ScrollArea>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
 
-        <form onSubmit={handleSendMessage} className="flex gap-2 pt-4 border-t">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type your message..."
-            disabled={isLoading}
-          />
-          <Button type="submit" size="icon" disabled={isLoading || !newMessage.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+          <form onSubmit={handleSendMessage} className="flex gap-2 p-4 border-t bg-background">
+            <Input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+              disabled={isLoading}
+              className="flex-1"
+              style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
+            />
+            <Button type="submit" size="icon" disabled={isLoading || !newMessage.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
 

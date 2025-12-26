@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DashboardNav from "@/components/DashboardNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Search, MapPin, Users, UserPlus, MessageCircle, UserCheck, Calendar } from "lucide-react";
+import { Search, MapPin, Users, UserPlus, MessageCircle, UserCheck, Calendar, Plane } from "lucide-react";
 import { CreateTravelGroupDialog } from "@/components/CreateTravelGroupDialog";
 import { TravelGroupCard } from "@/components/TravelGroupCard";
 
@@ -41,7 +40,19 @@ interface TravelGroup {
   member_count: number;
 }
 
+const NAV_TABS = [
+  { id: 'find', label: 'Find Buddies', icon: Search },
+  { id: 'nearby', label: 'Nearby', icon: MapPin },
+  { id: 'travel-with-me', label: 'Travel With Me', icon: Users },
+  { id: 'travel-groups', label: 'Travel Groups', icon: Plane },
+];
+
 const TravelBuddies = () => {
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'find';
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [destination, setDestination] = useState("");
   const [interest, setInterest] = useState("");
@@ -84,7 +95,6 @@ const TravelBuddies = () => {
       return;
     }
 
-    // Get member counts
     const groupsWithCounts = await Promise.all(
       (data || []).map(async (group: any) => {
         const { count } = await (supabase as any)
@@ -203,196 +213,174 @@ const TravelBuddies = () => {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Travel Buddies</h1>
-          <p className="text-muted-foreground">Find and connect with fellow travelers</p>
-        </div>
-
-        <Tabs defaultValue="find" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="find">
-              <Search className="h-4 w-4 mr-2" />
-              Find Buddies
-            </TabsTrigger>
-            <TabsTrigger value="nearby">
-              <MapPin className="h-4 w-4 mr-2" />
-              Nearby
-            </TabsTrigger>
-            <TabsTrigger value="travel-with-me">
-              <Users className="h-4 w-4 mr-2" />
-              Travel With Me
-            </TabsTrigger>
-            <TabsTrigger value="travel-groups">
-              <Users className="h-4 w-4 mr-2" />
-              Travel Groups
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="find" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Search for Travel Buddies</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 mb-6">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Search by name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={performSearch} disabled={loading}>
-                      <Search className="h-4 w-4 mr-2" />
-                      {loading ? "Searching..." : "Search"}
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      placeholder="Filter by destination..."
-                      value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
-                    />
-                    <Select value={interest} onValueChange={setInterest}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by interest" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="adventure">Adventure</SelectItem>
-                        <SelectItem value="beach">Beach</SelectItem>
-                        <SelectItem value="culture">Culture</SelectItem>
-                        <SelectItem value="food">Food</SelectItem>
-                        <SelectItem value="hiking">Hiking</SelectItem>
-                        <SelectItem value="photography">Photography</SelectItem>
-                        <SelectItem value="wildlife">Wildlife</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'find':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Search for Travel Buddies</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 mb-6">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={performSearch} disabled={loading}>
+                    <Search className="h-4 w-4 mr-2" />
+                    {loading ? "Searching..." : "Search"}
+                  </Button>
                 </div>
-
-                {searchResults.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p>Start searching to find travel buddies with similar interests</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {searchResults.map((result) => (
-                      <Card key={result.id} className="hover:shadow-lg transition-shadow">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar 
-                              className="h-12 w-12 cursor-pointer" 
-                              onClick={() => navigate(`/profile/${result.id}`)}
-                            >
-                              <AvatarImage src={result.avatar_url || undefined} />
-                              <AvatarFallback>{getInitials(result.full_name)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <CardTitle 
-                                className="text-base cursor-pointer hover:underline truncate"
-                                onClick={() => navigate(`/profile/${result.id}`)}
-                              >
-                                {result.full_name || "Anonymous"}
-                              </CardTitle>
-                              {result.home_location && (
-                                <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
-                                  <MapPin className="h-3 w-3" />
-                                  {result.home_location}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {result.bio && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">{result.bio}</p>
-                          )}
-                          {result.interests && result.interests.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {result.interests.slice(0, 3).map((int, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs">
-                                  {int}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            {result.connection_status === "connected" ? (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1"
-                                  onClick={() => navigate(`/messages?user=${result.id}`)}
-                                >
-                                  <MessageCircle className="h-4 w-4 mr-1" />
-                                  Message
-                                </Button>
-                                <Button variant="outline" size="sm" disabled>
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Connected
-                                </Button>
-                              </>
-                            ) : result.connection_status === "pending_sent" ? (
-                              <Button variant="outline" size="sm" className="flex-1" disabled>
-                                Pending
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                className="flex-1"
-                                onClick={() => sendConnectionRequest(result.id)}
-                              >
-                                <UserPlus className="h-4 w-4 mr-1" />
-                                Connect
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="nearby" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Travelers Nearby</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <MapPin className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p>Enable location to find travelers near you</p>
-                  <Button className="mt-4">Enable Location</Button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    placeholder="Filter by destination..."
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                  />
+                  <Select value={interest} onValueChange={setInterest}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by interest" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="adventure">Adventure</SelectItem>
+                      <SelectItem value="beach">Beach</SelectItem>
+                      <SelectItem value="culture">Culture</SelectItem>
+                      <SelectItem value="food">Food</SelectItem>
+                      <SelectItem value="hiking">Hiking</SelectItem>
+                      <SelectItem value="photography">Photography</SelectItem>
+                      <SelectItem value="wildlife">Wildlife</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
 
-          <TabsContent value="travel-with-me" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Post Your Travel Plans</CardTitle>
-              </CardHeader>
-              <CardContent>
+              {searchResults.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p>Share your travel plans and invite others to join you</p>
-                  <Button className="mt-4">Create Travel Plan</Button>
+                  <p>Start searching to find travel buddies with similar interests</p>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {searchResults.map((result) => (
+                    <Card key={result.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar 
+                            className="h-12 w-12 cursor-pointer" 
+                            onClick={() => navigate(`/profile/${result.id}`)}
+                          >
+                            <AvatarImage src={result.avatar_url || undefined} />
+                            <AvatarFallback>{getInitials(result.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle 
+                              className="text-base cursor-pointer hover:underline truncate"
+                              onClick={() => navigate(`/profile/${result.id}`)}
+                            >
+                              {result.full_name || "Anonymous"}
+                            </CardTitle>
+                            {result.home_location && (
+                              <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
+                                <MapPin className="h-3 w-3" />
+                                {result.home_location}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {result.bio && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{result.bio}</p>
+                        )}
+                        {result.interests && result.interests.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {result.interests.slice(0, 3).map((int, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {int}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          {result.connection_status === "connected" ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => navigate(`/messages?user=${result.id}`)}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-1" />
+                                Message
+                              </Button>
+                              <Button variant="outline" size="sm" disabled>
+                                <UserCheck className="h-4 w-4 mr-1" />
+                                Connected
+                              </Button>
+                            </>
+                          ) : result.connection_status === "pending_sent" ? (
+                            <Button variant="outline" size="sm" className="flex-1" disabled>
+                              Pending
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => sendConnectionRequest(result.id)}
+                            >
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Connect
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
 
-          <TabsContent value="travel-groups" className="mt-6">
+      case 'nearby':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Travelers Nearby</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <MapPin className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p>Enable location to find travelers near you</p>
+                <Button className="mt-4">Enable Location</Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 'travel-with-me':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Post Your Travel Plans</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p>Share your travel plans and invite others to join you</p>
+                <Button className="mt-4">Create Travel Plan</Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 'travel-groups':
+        return (
+          <>
             <div className="mb-6 flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-bold">Travel Groups</h2>
@@ -423,8 +411,51 @@ const TravelBuddies = () => {
                 ))}
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <DashboardNav />
+      
+      {/* Upper Navigation Bar */}
+      <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-sm border-b">
+        <div className="container mx-auto px-4">
+          <nav className="flex items-center gap-1 overflow-x-auto py-2">
+            {NAV_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                    isActive 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">Travel Buddies</h1>
+          <p className="text-muted-foreground">Find and connect with fellow travelers</p>
+        </div>
+
+        {renderContent()}
       </div>
     </div>
   );
