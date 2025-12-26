@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, Globe, Camera, Ticket, Bot, Smartphone, ArrowRight, Check } from "lucide-react";
+import { useReducedMotion } from "@/contexts/ReducedMotionContext";
+import ReduceMotionToggle from "@/components/ReduceMotionToggle";
 
 const features = [
   {
@@ -84,8 +86,9 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 const HorizontalScrollFeatures = () => {
   const containerRef = useRef<HTMLElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [progress, setProgress] = useState(0); // 0..(features.length-1)
+  const [progress, setProgress] = useState(0);
   const [locked, setLocked] = useState(false);
+  const { prefersReducedMotion } = useReducedMotion();
 
   const maxProgress = useMemo(() => Math.max(0, features.length - 1), []);
 
@@ -100,7 +103,6 @@ const HorizontalScrollFeatures = () => {
     setLocked(false);
   }, []);
 
-  // Lock only when the section fully occupies the viewport
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -122,7 +124,6 @@ const HorizontalScrollFeatures = () => {
     return () => io.disconnect();
   }, [lock, unlock]);
 
-  // Wheel -> horizontal progress (no vertical movement while locked)
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (!locked) return;
@@ -130,7 +131,6 @@ const HorizontalScrollFeatures = () => {
       const delta = e.deltaY;
       const next = clamp(progress + delta * 0.0025, 0, maxProgress);
 
-      // If we can move horizontally, consume the wheel.
       if (next !== progress) {
         e.preventDefault();
         setProgress(next);
@@ -138,8 +138,6 @@ const HorizontalScrollFeatures = () => {
         return;
       }
 
-      // At the ends: unlock AND nudge scroll so we actually exit the section
-      // (prevents the observer from immediately re-locking at the same spot).
       const leavingDown = progress >= maxProgress && delta > 0;
       const leavingUp = progress <= 0 && delta < 0;
       if (leavingDown || leavingUp) {
@@ -154,7 +152,6 @@ const HorizontalScrollFeatures = () => {
     return () => window.removeEventListener("wheel", onWheel as any);
   }, [locked, progress, maxProgress, unlock]);
 
-  // Keyboard support (optional but improves “site-like” feel)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!locked) return;
@@ -171,6 +168,7 @@ const HorizontalScrollFeatures = () => {
   }, [locked, progress, maxProgress]);
 
   const translateX = -progress * 100;
+  const progressPercent = (progress / maxProgress) * 100;
 
   return (
     <section
@@ -179,7 +177,43 @@ const HorizontalScrollFeatures = () => {
       className="relative h-screen -mb-px"
       aria-label="Travexa features"
     >
-      {/* Progress Indicator */}
+      {/* Top Progress Bar + Counter */}
+      <div
+        className="fixed top-20 left-0 right-0 z-50 px-4 transition-opacity duration-300"
+        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 bg-card/80 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg border">
+            {/* Slide Counter */}
+            <div className="flex items-center gap-2 text-sm font-medium min-w-[60px]">
+              <span className="text-foreground">{activeIndex + 1}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-muted-foreground">{features.length}</span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${features[activeIndex]?.gradient || 'from-primary to-accent'} rounded-full`}
+                style={{ 
+                  width: `${progressPercent}%`,
+                  transition: prefersReducedMotion ? 'none' : 'width 150ms ease-out'
+                }}
+              />
+            </div>
+            
+            {/* Feature Title */}
+            <div className="hidden sm:block text-sm font-medium text-foreground min-w-[140px] text-right truncate">
+              {features[activeIndex]?.title}
+            </div>
+
+            {/* Reduce Motion Toggle */}
+            <ReduceMotionToggle compact className="ml-2" />
+          </div>
+        </div>
+      </div>
+
+      {/* Side Navigation (Desktop) */}
       <div
         className="fixed left-8 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col gap-4 transition-opacity duration-500"
         style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
@@ -193,13 +227,15 @@ const HorizontalScrollFeatures = () => {
                 setActiveIndex(idx);
               }}
               className={`
-                flex items-center gap-3 w-full p-2 rounded-xl transition-all duration-300
+                flex items-center gap-3 w-full p-2 rounded-xl transition-all
+                ${prefersReducedMotion ? '' : 'duration-300'}
                 ${activeIndex === idx ? "bg-primary/10" : "hover:bg-muted/50"}
               `}
             >
               <div
                 className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-300
+                  w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all
+                  ${prefersReducedMotion ? '' : 'duration-300'}
                   ${activeIndex === idx
                     ? `bg-gradient-to-r ${feature.gradient} text-white shadow-lg scale-110`
                     : "bg-muted text-muted-foreground"}
@@ -217,13 +253,6 @@ const HorizontalScrollFeatures = () => {
             </button>
           ))}
         </div>
-
-        <div className="h-1 bg-muted rounded-full overflow-hidden mx-4">
-          <div
-            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-100"
-            style={{ width: `${(progress / maxProgress) * 100}%` }}
-          />
-        </div>
       </div>
 
       {/* Mobile Progress Dots */}
@@ -239,7 +268,8 @@ const HorizontalScrollFeatures = () => {
               setActiveIndex(idx);
             }}
             className={`
-              w-3 h-3 rounded-full transition-all duration-300
+              w-3 h-3 rounded-full transition-all
+              ${prefersReducedMotion ? '' : 'duration-300'}
               ${activeIndex === idx ? `bg-gradient-to-r ${feature.gradient} scale-125` : "bg-muted hover:bg-muted-foreground/50"}
             `}
             aria-label={`Go to ${feature.title}`}
@@ -250,8 +280,12 @@ const HorizontalScrollFeatures = () => {
       {/* Track */}
       <div className="absolute inset-0 overflow-hidden">
         <div
-          className="flex h-full transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(${translateX}%)`, width: `${features.length * 100}%` }}
+          className="flex h-full"
+          style={{ 
+            transform: `translateX(${translateX}%)`, 
+            width: `${features.length * 100}%`,
+            transition: prefersReducedMotion ? 'none' : 'transform 200ms ease-out'
+          }}
         >
           {features.map((feature, idx) => (
             <article
@@ -262,14 +296,18 @@ const HorizontalScrollFeatures = () => {
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgGradient} dark:opacity-100 opacity-0`} />
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.lightBg} dark:opacity-0 opacity-50`} />
 
-              <div
-                className={`absolute -top-20 -right-20 w-[500px] h-[500px] bg-gradient-to-r ${feature.gradient} rounded-full blur-[100px] opacity-20`}
-                style={{ transform: `translate(${(progress - idx) * -50}px, ${(progress - idx) * 30}px)` }}
-              />
-              <div
-                className={`absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-gradient-to-r ${feature.gradient} rounded-full blur-[120px] opacity-15`}
-                style={{ transform: `translate(${(progress - idx) * -40}px, ${(progress - idx) * -20}px)` }}
-              />
+              {!prefersReducedMotion && (
+                <>
+                  <div
+                    className={`absolute -top-20 -right-20 w-[500px] h-[500px] bg-gradient-to-r ${feature.gradient} rounded-full blur-[100px] opacity-20`}
+                    style={{ transform: `translate(${(progress - idx) * -50}px, ${(progress - idx) * 30}px)` }}
+                  />
+                  <div
+                    className={`absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-gradient-to-r ${feature.gradient} rounded-full blur-[120px] opacity-15`}
+                    style={{ transform: `translate(${(progress - idx) * -40}px, ${(progress - idx) * -20}px)` }}
+                  />
+                </>
+              )}
 
               <div className="container mx-auto px-6 md:px-12 lg:px-20 py-20 max-w-7xl relative z-10">
                 <div
@@ -278,13 +316,18 @@ const HorizontalScrollFeatures = () => {
                   } items-center gap-12 lg:gap-20`}
                 >
                   <div
-                    className="flex-1 flex justify-center transition-transform duration-200"
-                    style={{ transform: `translateX(${(progress - idx) * 40}px)` }}
+                    className="flex-1 flex justify-center"
+                    style={{ 
+                      transform: prefersReducedMotion ? 'none' : `translateX(${(progress - idx) * 40}px)`,
+                      transition: prefersReducedMotion ? 'none' : 'transform 200ms ease-out'
+                    }}
                   >
                     <div className="relative">
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl blur-3xl opacity-40 scale-125`}
-                      />
+                      {!prefersReducedMotion && (
+                        <div
+                          className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl blur-3xl opacity-40 scale-125`}
+                        />
+                      )}
 
                       <div className="relative bg-card/80 backdrop-blur-xl border rounded-3xl p-8 md:p-12 shadow-2xl">
                         <div
@@ -306,19 +349,29 @@ const HorizontalScrollFeatures = () => {
                           ))}
                         </div>
 
-                        <div
-                          className="absolute -top-6 -right-6 text-5xl md:text-6xl"
-                          style={{ animation: "float 4s ease-in-out infinite" }}
-                        >
-                          {feature.emoji}
-                        </div>
+                        {!prefersReducedMotion && (
+                          <div
+                            className="absolute -top-6 -right-6 text-5xl md:text-6xl"
+                            style={{ animation: "float 4s ease-in-out infinite" }}
+                          >
+                            {feature.emoji}
+                          </div>
+                        )}
+                        {prefersReducedMotion && (
+                          <div className="absolute -top-6 -right-6 text-5xl md:text-6xl">
+                            {feature.emoji}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div
-                    className="flex-1 text-center lg:text-left transition-transform duration-200"
-                    style={{ transform: `translateX(${(progress - idx) * 25}px)` }}
+                    className="flex-1 text-center lg:text-left"
+                    style={{ 
+                      transform: prefersReducedMotion ? 'none' : `translateX(${(progress - idx) * 25}px)`,
+                      transition: prefersReducedMotion ? 'none' : 'transform 200ms ease-out'
+                    }}
                   >
                     <Badge
                       className={`mb-6 bg-gradient-to-r ${feature.gradient} text-white border-0 text-sm px-5 py-2 shadow-lg`}
@@ -336,11 +389,13 @@ const HorizontalScrollFeatures = () => {
                     <Button
                       size="lg"
                       asChild
-                      className={`px-8 py-6 text-lg bg-gradient-to-r ${feature.gradient} border-0 hover:opacity-90 transition-all hover:scale-105 shadow-xl group`}
+                      className={`px-8 py-6 text-lg bg-gradient-to-r ${feature.gradient} border-0 hover:opacity-90 shadow-xl group ${
+                        prefersReducedMotion ? '' : 'transition-all hover:scale-105'
+                      }`}
                     >
                       <Link to="/signup">
                         Get Started
-                        <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className={`ml-2 h-5 w-5 ${prefersReducedMotion ? '' : 'group-hover:translate-x-1 transition-transform'}`} />
                       </Link>
                     </Button>
                   </div>

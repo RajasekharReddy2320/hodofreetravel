@@ -108,4 +108,18 @@ Bluish-Grey, White, Black palette
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Reduce motion accessibility */
+  .reduce-motion,
+  .reduce-motion * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .reduce-motion .animate-pulse,
+  .reduce-motion .animate-bounce,
+  .reduce-motion .animate-spin {
+    animation: none !important;
+  }
 }
