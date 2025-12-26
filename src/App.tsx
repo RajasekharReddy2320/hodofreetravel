@@ -29,6 +29,18 @@ import LocalGuides from "./pages/LocalGuides";
 import GeneratedItineraries from "./pages/GeneratedItineraries";
 import PhotoVault from "./pages/PhotoVault";
 import Knowledge from "./pages/Knowledge";
+import PNREnquiry from "./pages/trains/PNREnquiry";
+import LastTransaction from "./pages/trains/LastTransaction";
+import CancelTicket from "./pages/trains/CancelTicket";
+import FileTDR from "./pages/trains/FileTDR";
+import RefundHistory from "./pages/trains/RefundHistory";
+import EWallet from "./pages/trains/EWallet";
+import ChartVacancy from "./pages/trains/ChartVacancy";
+import TrainSchedule from "./pages/trains/TrainSchedule";
+import TrackTrain from "./pages/trains/TrackTrain";
+import AIAssistant from "./pages/trains/AIAssistant";
+import MetroBooking from "./pages/trains/MetroBooking";
+import FestivalRoundTrip from "./pages/trains/FestivalRoundTrip";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +76,18 @@ const App = () => (
               <Route path="/local-guides" element={<LocalGuides />} />
               <Route path="/photo-vault" element={<PhotoVault />} />
               <Route path="/knowledge" element={<Knowledge />} />
+              <Route path="/trains/pnr-enquiry" element={<PNREnquiry />} />
+              <Route path="/trains/last-transaction" element={<LastTransaction />} />
+              <Route path="/trains/cancel-ticket" element={<CancelTicket />} />
+              <Route path="/trains/file-tdr" element={<FileTDR />} />
+              <Route path="/trains/refund-history" element={<RefundHistory />} />
+              <Route path="/trains/e-wallet" element={<EWallet />} />
+              <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
+              <Route path="/trains/schedule" element={<TrainSchedule />} />
+              <Route path="/trains/track-train" element={<TrackTrain />} />
+              <Route path="/trains/ai-assistant" element={<AIAssistant />} />
+              <Route path="/trains/metro" element={<MetroBooking />} />
+              <Route path="/trains/festival-round-trip" element={<FestivalRoundTrip />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
