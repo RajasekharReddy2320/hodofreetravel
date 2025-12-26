@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardNav from "@/components/DashboardNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, ArrowRight, Clock } from "lucide-react";
+import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, Clock, TrainFront, Ticket, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { TrainServicesGrid } from "@/components/TrainServicesGrid";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { differenceInHours, parseISO, format } from "date-fns";
 
 const searchSchema = z.object({
   from: z.string().trim().min(2, "Origin must be at least 2 characters").max(100),
@@ -17,21 +20,35 @@ const searchSchema = z.object({
   passengers: z.number().int().min(1).max(9)
 });
 
-type BookingSection = 'flights' | 'trains' | 'buses' | 'hotels' | 'cabs';
+type BookingSection = 'flights' | 'trains' | 'buses' | 'metro' | 'hotels' | 'cabs';
 
 const SECTIONS: { id: BookingSection; label: string; icon: typeof Plane }[] = [
   { id: 'flights', label: 'Flights', icon: Plane },
   { id: 'trains', label: 'Trains', icon: Train },
   { id: 'buses', label: 'Buses', icon: Bus },
+  { id: 'metro', label: 'Metro', icon: TrainFront },
   { id: 'hotels', label: 'Hotels', icon: Hotel },
   { id: 'cabs', label: 'Cabs', icon: Car },
 ];
+
+interface UpcomingBooking {
+  id: string;
+  from_location: string;
+  to_location: string;
+  departure_date: string;
+  departure_time: string;
+  service_name: string;
+  booking_type: string;
+  booking_reference: string;
+}
 
 export default function BookingHub() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<BookingSection>('flights');
   const [loading, setLoading] = useState(false);
+  const [upcomingTicket, setUpcomingTicket] = useState<UpcomingBooking | null>(null);
+  const [showUpcomingDialog, setShowUpcomingDialog] = useState(false);
   
   // Common form state
   const [origin, setOrigin] = useState("");
@@ -49,9 +66,43 @@ export default function BookingHub() {
   const [trains, setTrains] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
 
+  // Check for upcoming journeys within 4 hours on page load
+  useEffect(() => {
+    checkUpcomingJourney();
+  }, []);
+
+  const checkUpcomingJourney = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const now = new Date();
+    
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("status", "confirmed")
+      .gte("departure_date", format(now, "yyyy-MM-dd"))
+      .order("departure_date", { ascending: true })
+      .order("departure_time", { ascending: true });
+
+    if (bookings && bookings.length > 0) {
+      for (const booking of bookings) {
+        const departureDateTime = parseISO(`${booking.departure_date}T${booking.departure_time}`);
+        const hoursUntilDeparture = differenceInHours(departureDateTime, now);
+        
+        if (hoursUntilDeparture >= 0 && hoursUntilDeparture <= 4) {
+          setUpcomingTicket(booking);
+          setShowUpcomingDialog(true);
+          break;
+        }
+      }
+    }
+  };
+
   const handleSearch = async () => {
-    if (activeSection === 'hotels' || activeSection === 'cabs') {
-      toast({ title: "Coming Soon", description: `${activeSection} booking will be available soon!` });
+    if (activeSection === 'hotels' || activeSection === 'cabs' || activeSection === 'metro' || activeSection === 'buses') {
+      toast({ title: "Coming Soon", description: `${activeSection.charAt(0).toUpperCase() + activeSection.slice(1)} booking will be available soon!` });
       return;
     }
 
@@ -148,25 +199,87 @@ export default function BookingHub() {
     );
   };
 
+  const renderComingSoon = (type: string, emoji: string) => (
+    <Card className="border-dashed">
+      <CardContent className="p-12 text-center">
+        <div className="text-6xl mb-4">{emoji}</div>
+        <h3 className="text-xl font-semibold mb-2">{type} Booking Coming Soon!</h3>
+        <p className="text-muted-foreground">We're working on bringing you the best {type.toLowerCase()} options. Stay tuned!</p>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
+
+      {/* Upcoming Journey Dialog */}
+      <Dialog open={showUpcomingDialog} onOpenChange={setShowUpcomingDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              Upcoming Journey Alert!
+            </DialogTitle>
+            <DialogDescription>
+              Your journey is starting soon. Here's your ticket.
+            </DialogDescription>
+          </DialogHeader>
+          {upcomingTicket && (
+            <div className="space-y-4">
+              <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-0">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-muted-foreground capitalize">{upcomingTicket.booking_type}</span>
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">Departing Soon</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="font-semibold">{upcomingTicket.from_location}</p>
+                      <p className="text-sm text-muted-foreground">{upcomingTicket.departure_time}</p>
+                    </div>
+                    <div className="flex-1 flex items-center">
+                      <div className="h-px flex-1 bg-border"></div>
+                      <Ticket className="h-4 w-4 mx-2 text-primary" />
+                      <div className="h-px flex-1 bg-border"></div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{upcomingTicket.to_location}</p>
+                      <p className="text-sm text-muted-foreground">{upcomingTicket.departure_date}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm mt-3 text-muted-foreground">{upcomingTicket.service_name}</p>
+                </CardContent>
+              </Card>
+              <Button 
+                className="w-full" 
+                onClick={() => {
+                  setShowUpcomingDialog(false);
+                  navigate('/ticket-details', { state: { booking: upcomingTicket } });
+                }}
+              >
+                View Full Ticket
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header with Section Nav */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-4xl font-bold mb-2">Book Your Journey</h1>
-            <p className="text-muted-foreground">Find the best deals on flights, trains, buses, hotels & cabs</p>
+            <p className="text-muted-foreground">Find the best deals on flights, trains, buses, metro, hotels & cabs</p>
           </div>
           
           {/* Section Navigation - Top Right */}
-          <div className="flex items-center gap-1 bg-muted p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-xl overflow-x-auto">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveSection(id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   activeSection === id 
                     ? 'bg-background shadow-md text-foreground' 
                     : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
@@ -179,108 +292,108 @@ export default function BookingHub() {
           </div>
         </div>
 
-        {/* Search Form */}
-        <Card className="mb-8 border-2 shadow-lg overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b">
-            <CardTitle className="flex items-center gap-2">
-              {SECTIONS.find(s => s.id === activeSection)?.icon && (
-                <span className="p-2 bg-primary rounded-lg">
-                  {(() => { const Icon = SECTIONS.find(s => s.id === activeSection)!.icon; return <Icon className="h-5 w-5 text-primary-foreground" />; })()}
-                </span>
-              )}
-              Search {SECTIONS.find(s => s.id === activeSection)?.label}
-            </CardTitle>
-            <CardDescription>Enter your travel details to find the best options</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            {activeSection === 'hotels' ? (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="md:col-span-1">
-                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
-                  <Input placeholder="City or Hotel name" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-in</Label>
-                  <Input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-out</Label>
-                  <Input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Rooms</Label>
-                  <Input type="number" min="1" value={rooms} onChange={(e) => setRooms(e.target.value)} />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSearch} disabled={loading} className="w-full">
-                    <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                  </Button>
-                </div>
-              </div>
-            ) : activeSection === 'cabs' ? (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Pickup Location</Label>
-                  <Input placeholder="Enter pickup point" value={origin} onChange={(e) => setOrigin(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Drop Location</Label>
-                  <Input placeholder="Enter destination" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Date</Label>
-                  <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Clock size={14} /> Time</Label>
-                  <Input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSearch} disabled={loading} className="w-full">
-                    <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Origin</Label>
-                  <Input placeholder="From city" value={origin} onChange={(e) => setOrigin(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
-                  <Input placeholder="To city" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Departure Date</Label>
-                  <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Passengers</Label>
-                  <Input type="number" min="1" max="9" value={passengers} onChange={(e) => setPassengers(e.target.value)} />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSearch} disabled={loading} className="w-full">
-                    <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Train Services Grid for Trains tab */}
+        {activeSection === 'trains' && <TrainServicesGrid />}
 
-        {/* Results */}
-        {(activeSection === 'flights' || activeSection === 'trains' || activeSection === 'buses') && renderResults()}
-        
-        {(activeSection === 'hotels' || activeSection === 'cabs') && (
-          <Card className="border-dashed">
-            <CardContent className="p-12 text-center">
-              <div className="text-6xl mb-4">{activeSection === 'hotels' ? '🏨' : '🚕'}</div>
-              <h3 className="text-xl font-semibold mb-2">{activeSection === 'hotels' ? 'Hotel' : 'Cab'} Booking Coming Soon!</h3>
-              <p className="text-muted-foreground">We're working on bringing you the best {activeSection} options. Stay tuned!</p>
+        {/* Search Form - Not for Metro */}
+        {activeSection !== 'metro' && activeSection !== 'buses' && (
+          <Card className="mb-8 border-2 shadow-lg overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+              <CardTitle className="flex items-center gap-2">
+                {SECTIONS.find(s => s.id === activeSection)?.icon && (
+                  <span className="p-2 bg-primary rounded-lg">
+                    {(() => { const Icon = SECTIONS.find(s => s.id === activeSection)!.icon; return <Icon className="h-5 w-5 text-primary-foreground" />; })()}
+                  </span>
+                )}
+                Search {SECTIONS.find(s => s.id === activeSection)?.label}
+              </CardTitle>
+              <CardDescription>Enter your travel details to find the best options</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              {activeSection === 'hotels' ? (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="md:col-span-1">
+                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
+                    <Input placeholder="City or Hotel name" value={destination} onChange={(e) => setDestination(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-in</Label>
+                    <Input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Check-out</Label>
+                    <Input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Rooms</Label>
+                    <Input type="number" min="1" value={rooms} onChange={(e) => setRooms(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={handleSearch} disabled={loading} className="w-full">
+                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
+                    </Button>
+                  </div>
+                </div>
+              ) : activeSection === 'cabs' ? (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Pickup Location</Label>
+                    <Input placeholder="Enter pickup point" value={origin} onChange={(e) => setOrigin(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Drop Location</Label>
+                    <Input placeholder="Enter destination" value={destination} onChange={(e) => setDestination(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Date</Label>
+                    <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Clock size={14} /> Time</Label>
+                    <Input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={handleSearch} disabled={loading} className="w-full">
+                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Origin</Label>
+                    <Input placeholder="From city" value={origin} onChange={(e) => setOrigin(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><MapPin size={14} /> Destination</Label>
+                    <Input placeholder="To city" value={destination} onChange={(e) => setDestination(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Calendar size={14} /> Departure Date</Label>
+                    <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2"><Users size={14} /> Passengers</Label>
+                    <Input type="number" min="1" max="9" value={passengers} onChange={(e) => setPassengers(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={handleSearch} disabled={loading} className="w-full">
+                      <Search className="mr-2 h-4 w-4" /> {loading ? 'Searching...' : 'Search'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
+
+        {/* Results */}
+        {(activeSection === 'flights' || activeSection === 'trains') && renderResults()}
+        
+        {activeSection === 'buses' && renderComingSoon('Bus', '🚌')}
+        {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
+        {activeSection === 'hotels' && renderComingSoon('Hotel', '🏨')}
+        {activeSection === 'cabs' && renderComingSoon('Cab', '🚕')}
       </main>
     </div>
   );

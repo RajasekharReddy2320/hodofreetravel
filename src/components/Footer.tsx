@@ -84,7 +84,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-primary-foreground/20 pt-8 text-center text-sm text-primary-foreground/60">
           <p>&copy; {new Date().getFullYear()} Travexa. All rights reserved.</p>
-          <p className="mt-2 text-xs">Made with ❤️ by Rajasekhar</p>
+          <p className="mt-2 text-xs">Made with ❤️ by Team TraveXa</p>
         </div>
       </div>
     </footer>

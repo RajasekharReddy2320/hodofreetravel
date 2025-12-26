@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Wallet, Clock, CheckCircle, XCircle } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -585,38 +585,52 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Quick Access Cards - Photo Vault & Knowledge Base */}
+        {/* Quick Access Cards - Photo Vault, Knowledge Base & Wallet */}
         {isOwnProfile && (
           <div className="px-4 md:px-8 mt-8">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <Link to="/photo-vault" className="group">
                 <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-pink-500/10 via-rose-500/5 to-orange-500/10 hover:scale-[1.02]">
-                  <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-pink-500 to-orange-500 text-white shadow-lg">
-                      <Camera className="h-6 w-6" />
+                  <CardContent className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
+                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-pink-500 to-orange-500 text-white shadow-lg">
+                      <Camera className="h-5 w-5 md:h-6 md:w-6" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold group-hover:text-primary transition-colors">Photo Vault</h3>
-                      <p className="text-xs text-muted-foreground">Your travel memories</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Photo Vault</h3>
+                      <p className="text-xs text-muted-foreground hidden md:block">Your memories</p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-hover:translate-x-1 transition-transform hidden sm:block" />
                   </CardContent>
                 </Card>
               </Link>
               <Link to="/knowledge" className="group">
                 <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-violet-500/10 hover:scale-[1.02]">
-                  <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-lg">
-                      <BookOpen className="h-6 w-6" />
+                  <CardContent className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
+                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-lg">
+                      <BookOpen className="h-5 w-5 md:h-6 md:w-6" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold group-hover:text-primary transition-colors">Knowledge Base</h3>
-                      <p className="text-xs text-muted-foreground">Journals & experiences</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Knowledge</h3>
+                      <p className="text-xs text-muted-foreground hidden md:block">Journals</p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-hover:translate-x-1 transition-transform hidden sm:block" />
                   </CardContent>
                 </Card>
               </Link>
+              <div className="group cursor-pointer" onClick={() => navigate("/profile?tab=wallet")}>
+                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10 hover:scale-[1.02]">
+                  <CardContent className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
+                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg">
+                      <Wallet className="h-5 w-5 md:h-6 md:w-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Wallet</h3>
+                      <p className="text-xs text-muted-foreground hidden md:block">₹0.00</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-hover:translate-x-1 transition-transform hidden sm:block" />
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         )}
@@ -725,40 +739,121 @@ const Profile = () => {
             </TabsContent>
 
             <TabsContent value="bookings" className="mt-6 space-y-4">
-              {userBookings.length === 0 ? (
-                <div className="text-center py-16 bg-muted/30 rounded-2xl">
-                  <Ticket className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="font-semibold text-lg mb-1">No bookings yet</h3>
-                  <p className="text-muted-foreground text-sm mb-4">Book your first trip!</p>
-                  <Button onClick={() => navigate("/book")}>Book Now</Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {userBookings.map((booking) => (
-                    <Card key={booking.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-primary/10">
-                              <Ticket className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold">{booking.from_location} → {booking.to_location}</h4>
-                              <p className="text-sm text-muted-foreground capitalize">{booking.booking_type} • {booking.service_name}</p>
-                            </div>
+              {(() => {
+                const now = new Date();
+                const upcomingBookings = userBookings.filter(b => 
+                  b.status === "confirmed" && new Date(b.departure_date) >= now
+                );
+                const completedBookings = userBookings.filter(b => 
+                  b.status === "confirmed" && new Date(b.departure_date) < now
+                );
+                const cancelledBookings = userBookings.filter(b => 
+                  b.status === "cancelled"
+                );
+
+                const BookingCard = ({ booking }: { booking: any }) => (
+                  <Card 
+                    key={booking.id} 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => navigate('/ticket-details', { state: { booking } })}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-xl ${
+                            booking.status === "cancelled" 
+                              ? "bg-destructive/10" 
+                              : new Date(booking.departure_date) < now 
+                                ? "bg-green-500/10" 
+                                : "bg-primary/10"
+                          }`}>
+                            {booking.status === "cancelled" ? (
+                              <XCircle className="h-5 w-5 text-destructive" />
+                            ) : new Date(booking.departure_date) < now ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-primary" />
+                            )}
                           </div>
-                          <div className="text-right">
-                            <Badge variant={booking.status === "confirmed" ? "default" : "secondary"}>
-                              {booking.status}
-                            </Badge>
-                            <p className="text-sm font-semibold text-primary mt-1">₹{parseFloat(booking.price_inr).toLocaleString("en-IN")}</p>
+                          <div>
+                            <h4 className="font-semibold">{booking.from_location} → {booking.to_location}</h4>
+                            <p className="text-sm text-muted-foreground capitalize">{booking.booking_type} • {booking.service_name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{booking.departure_date} • {booking.departure_time}</p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                        <div className="text-right">
+                          <Badge variant={
+                            booking.status === "cancelled" 
+                              ? "destructive" 
+                              : new Date(booking.departure_date) < now 
+                                ? "secondary" 
+                                : "default"
+                          }>
+                            {booking.status === "cancelled" ? "Cancelled" : new Date(booking.departure_date) < now ? "Completed" : "Upcoming"}
+                          </Badge>
+                          <p className="text-sm font-semibold text-primary mt-1">₹{parseFloat(booking.price_inr).toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+
+                return (
+                  <Tabs defaultValue="upcoming" className="w-full">
+                    <TabsList className="w-full grid grid-cols-3 bg-muted/50 rounded-xl p-1 mb-4">
+                      <TabsTrigger value="upcoming" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm text-sm">
+                        <Clock className="h-4 w-4 mr-1" />
+                        Upcoming ({upcomingBookings.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="completed" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm text-sm">
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Completed ({completedBookings.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm text-sm">
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Cancelled ({cancelledBookings.length})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="upcoming" className="space-y-3">
+                      {upcomingBookings.length === 0 ? (
+                        <div className="text-center py-12 bg-muted/30 rounded-2xl">
+                          <Clock className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                          <h3 className="font-semibold mb-1">No upcoming journeys</h3>
+                          <p className="text-muted-foreground text-sm mb-4">Book your next adventure!</p>
+                          <Button onClick={() => navigate("/book-transport")}>Book Now</Button>
+                        </div>
+                      ) : (
+                        upcomingBookings.map((booking) => <BookingCard key={booking.id} booking={booking} />)
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="completed" className="space-y-3">
+                      {completedBookings.length === 0 ? (
+                        <div className="text-center py-12 bg-muted/30 rounded-2xl">
+                          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                          <h3 className="font-semibold mb-1">No completed journeys</h3>
+                          <p className="text-muted-foreground text-sm">Your travel history will appear here</p>
+                        </div>
+                      ) : (
+                        completedBookings.map((booking) => <BookingCard key={booking.id} booking={booking} />)
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="cancelled" className="space-y-3">
+                      {cancelledBookings.length === 0 ? (
+                        <div className="text-center py-12 bg-muted/30 rounded-2xl">
+                          <XCircle className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                          <h3 className="font-semibold mb-1">No cancelled bookings</h3>
+                          <p className="text-muted-foreground text-sm">That's great! Keep traveling</p>
+                        </div>
+                      ) : (
+                        cancelledBookings.map((booking) => <BookingCard key={booking.id} booking={booking} />)
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>

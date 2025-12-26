@@ -1,132 +1,81 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
 import { 
   Ticket, 
   BookOpen, 
   Search, 
-  CreditCard, 
   CalendarDays, 
-  XCircle, 
   FileWarning, 
-  RotateCcw, 
-  Wallet, 
   BarChart3, 
   Clock, 
-  MapPin, 
-  Bot, 
-  Train as TrainIcon,
-  RefreshCcw 
+  MapPin,
+  Train as TrainIcon
 } from "lucide-react";
 
 interface ServiceItem {
   icon: React.ElementType;
   label: string;
   color: string;
-  action: () => void;
+  route: string;
 }
 
 export const TrainServicesGrid = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const showComingSoon = (feature: string) => {
-    toast({ 
-      title: "Coming Soon", 
-      description: `${feature} will be available soon!` 
-    });
-  };
 
   const services: ServiceItem[] = [
     {
-      icon: Ticket,
-      label: "Book Ticket",
+      icon: TrainIcon,
+      label: "Book Train",
       color: "text-purple-600 bg-purple-100",
-      action: () => {} // Already on booking page
+      route: "/book-transport"
     },
     {
       icon: BookOpen,
       label: "My Bookings",
       color: "text-green-600 bg-green-100",
-      action: () => navigate("/my-tickets")
+      route: "/my-tickets"
     },
     {
       icon: Search,
       label: "PNR Enquiry",
       color: "text-blue-600 bg-blue-100",
-      action: () => showComingSoon("PNR Enquiry")
-    },
-    {
-      icon: CreditCard,
-      label: "Last Transaction",
-      color: "text-slate-600 bg-slate-100",
-      action: () => showComingSoon("Last Transaction")
+      route: "/trains/pnr-enquiry"
     },
     {
       icon: CalendarDays,
       label: "Upcoming Journey",
       color: "text-orange-600 bg-orange-100",
-      action: () => navigate("/my-tickets")
-    },
-    {
-      icon: XCircle,
-      label: "Cancel Ticket",
-      color: "text-teal-600 bg-teal-100",
-      action: () => showComingSoon("Cancel Ticket")
+      route: "/my-tickets"
     },
     {
       icon: FileWarning,
       label: "File TDR",
       color: "text-red-600 bg-red-100",
-      action: () => showComingSoon("File TDR")
-    },
-    {
-      icon: RotateCcw,
-      label: "Refund History",
-      color: "text-pink-600 bg-pink-100",
-      action: () => showComingSoon("Refund History")
-    },
-    {
-      icon: Wallet,
-      label: "IRCTC E-Wallet",
-      color: "text-blue-700 bg-blue-100",
-      action: () => showComingSoon("IRCTC E-Wallet")
+      route: "/trains/file-tdr"
     },
     {
       icon: BarChart3,
       label: "Chart Vacancy",
       color: "text-amber-600 bg-amber-100",
-      action: () => showComingSoon("Chart Vacancy")
+      route: "/trains/chart-vacancy"
     },
     {
       icon: Clock,
       label: "Train Schedule",
       color: "text-emerald-600 bg-emerald-100",
-      action: () => showComingSoon("Train Schedule")
+      route: "/trains/schedule"
     },
     {
       icon: MapPin,
       label: "Track Your Train",
       color: "text-red-500 bg-red-100",
-      action: () => showComingSoon("Track Your Train")
+      route: "/trains/track-train"
     },
     {
-      icon: Bot,
-      label: "Ask Disha 2.0",
-      color: "text-cyan-600 bg-cyan-100",
-      action: () => showComingSoon("Ask Disha 2.0")
-    },
-    {
-      icon: TrainIcon,
-      label: "Delhi Metro",
-      color: "text-blue-500 bg-blue-100",
-      action: () => showComingSoon("Delhi Metro")
-    },
-    {
-      icon: RefreshCcw,
-      label: "Festival Round Trip",
-      color: "text-purple-700 bg-purple-100",
-      action: () => showComingSoon("Festival Round Trip")
+      icon: Ticket,
+      label: "My Tickets",
+      color: "text-indigo-600 bg-indigo-100",
+      route: "/my-tickets"
     },
   ];
 
@@ -138,7 +87,7 @@ export const TrainServicesGrid = () => {
           <Card 
             key={idx}
             className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-0 shadow-sm"
-            onClick={service.action}
+            onClick={() => navigate(service.route)}
           >
             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
               <div className={`p-3 rounded-xl mb-2 ${service.color}`}>
