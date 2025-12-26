@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import DashboardNav from "@/components/DashboardNav";
 import ItineraryCard from "@/components/planner/ItineraryCard";
-import ItineraryMap from "@/components/planner/ItineraryMap";
+import InteractiveRouteMap from "@/components/planner/InteractiveRouteMap";
 import PlannerCart from "@/components/planner/PlannerCart";
 import CustomizeItinerary from "@/components/planner/CustomizeItinerary";
 import { ItineraryStep, CartItem } from "@/types/tripPlanner";
@@ -291,9 +291,13 @@ export default function GeneratedItineraries() {
               </div>
             </div>
 
-            {/* Map */}
+            {/* Interactive Map */}
             {selectedItinerary.steps && selectedItinerary.steps.length > 0 && (
-              <ItineraryMap steps={selectedItinerary.steps} />
+              <InteractiveRouteMap 
+                steps={selectedItinerary.steps} 
+                currentLocation={currentLocation}
+                destination={destination}
+              />
             )}
 
             {/* Timeline */}

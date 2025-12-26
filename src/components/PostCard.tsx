@@ -24,6 +24,7 @@ import { ItineraryBookingDialog } from "./ItineraryBookingDialog";
 import { TripPlanViewDialog } from "./TripPlanViewDialog";
 import { ConnectButton } from "./ConnectButton";
 import { EditPostDialog } from "./EditPostDialog";
+import { SharePostDialog } from "./SharePostDialog";
 
 interface PostCardProps {
   post: {
@@ -51,6 +52,7 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPlanViewDialog, setShowPlanViewDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -104,8 +106,7 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
   };
 
   const handleShare = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
-    toast({ title: "Link copied to clipboard!" });
+    setShowShareDialog(true);
   };
 
   const handleDelete = async () => {
@@ -424,6 +425,14 @@ export const PostCard = ({ post, currentUserId, userLiked, userSaved, onUpdate }
         onOpenChange={setShowEditDialog}
         post={post}
         onPostUpdated={onUpdate}
+      />
+
+      <SharePostDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        postId={post.id}
+        postContent={post.content}
+        postAuthor={post.profiles.full_name || "Unknown User"}
       />
     </>
   );

@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Hotel, Search } from "lucide-react";
+import { Plane, Train, Bus, Search } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { TrainServicesGrid } from "@/components/TrainServicesGrid";
 
 // Security: Search validation schema
 const searchSchema = z.object({
@@ -293,6 +294,9 @@ export default function BookTransport() {
           </TabsContent>
 
           <TabsContent value="trains">
+            {/* IRCTC-style Services Grid */}
+            <TrainServicesGrid />
+            
             <div className="space-y-4">
               {trains.length === 0 ? (
                 <Card>
