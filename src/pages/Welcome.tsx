@@ -150,9 +150,7 @@ const Welcome = () => {
 
                   {/* Travel the World Text */}
                   <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                    <p className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500">
-                      Travel the World
-                    </p>
+                    <p className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500">Travel the World with TraveXa</p>
                   </div>
                 </div>
               </AnimatedSection>
