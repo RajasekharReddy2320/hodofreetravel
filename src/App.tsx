@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { ReducedMotionProvider } from "@/contexts/ReducedMotionContext";
+import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
+import { NotificationInitializer } from "@/components/NotificationInitializer";
 import Welcome from "./pages/Welcome";
 import Explore from "./pages/Explore";
 import Login from "./pages/Login";
@@ -44,6 +46,8 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <NotificationPermissionBanner />
+          <NotificationInitializer />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Explore />} />
