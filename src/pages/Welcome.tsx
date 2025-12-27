@@ -9,60 +9,59 @@ import FloatingParticles from "@/components/FloatingParticles";
 import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { Plane, Sparkles, Globe, ChevronDown } from "lucide-react";
-
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
-
 const AnimatedSection = ({
   children,
   className = "",
-  delay = 0,
+  delay = 0
 }: {
   children: React.ReactNode;
   className?: string;
   delay?: number;
 }) => {
-  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
-
-  return (
-    <div
-      ref={ref}
-      className={`transition-all duration-1000 ease-out will-change-transform ${className}`}
-      style={{
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? "translate3d(0,0,0)" : "translate3d(64px,0,0)",
-        transitionDelay: `${delay}ms`,
-      }}
-    >
+  const {
+    ref,
+    isVisible
+  } = useScrollAnimation({
+    threshold: 0.2
+  });
+  return <div ref={ref} className={`transition-all duration-1000 ease-out will-change-transform ${className}`} style={{
+    opacity: isVisible ? 1 : 0,
+    transform: isVisible ? "translate3d(0,0,0)" : "translate3d(64px,0,0)",
+    transitionDelay: `${delay}ms`
+  }}>
       {children}
-    </div>
-  );
+    </div>;
 };
-
 const Welcome = () => {
   const navigate = useNavigate();
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({
+      data: {
+        session
+      }
+    }) => {
       if (session) {
         navigate("/");
       }
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: {
+        subscription
+      }
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         navigate("/");
       }
     });
-
     return () => subscription.unsubscribe();
   }, [navigate]);
-
   const scrollToFeatures = () => {
-    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('features')?.scrollIntoView({
+      behavior: 'smooth'
+    });
   };
-
-  return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
+  return <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* Floating Particles Background */}
       <FloatingParticles />
 
@@ -70,7 +69,9 @@ const Welcome = () => {
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] animate-pulse" style={{
+        animationDelay: '1s'
+      }} />
       </div>
 
       {/* Header */}
@@ -138,11 +139,11 @@ const Welcome = () => {
                   
                   {/* 3D Globe Container */}
                   <div className="relative w-full h-full rounded-full overflow-hidden">
-                    <Suspense fallback={
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 animate-pulse flex items-center justify-center">
-                        <Globe className="h-20 w-20 text-white/50 animate-spin" style={{ animationDuration: '3s' }} />
-                      </div>
-                    }>
+                    <Suspense fallback={<div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 animate-pulse flex items-center justify-center">
+                        <Globe className="h-20 w-20 text-white/50 animate-spin" style={{
+                      animationDuration: '3s'
+                    }} />
+                      </div>}>
                       <RealisticGlobe />
                     </Suspense>
                   </div>
@@ -211,7 +212,7 @@ const Welcome = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <div className="text-center md:text-left">
               <p>© {new Date().getFullYear()} Travexa. All rights reserved.</p>
-              <p className="text-xs mt-1">Made with ❤️ by Pranay with Rajasekhar</p>
+              <p className="text-xs mt-1">Made with ❤️ by Team TraveXa</p>
             </div>
             <div className="flex gap-6">
               <Link to="/login" className="hover:text-foreground transition-colors">Login</Link>
@@ -246,8 +247,6 @@ const Welcome = () => {
           animation: gradient 4s ease infinite;
         }
       `}</style>
-    </div>
-  );
+    </div>;
 };
-
 export default Welcome;
