@@ -699,7 +699,7 @@ const Explore = () => {
   }
   const tabs = [{
     id: 'feed' as const,
-    label: 'Feed',
+    label: 'Tramigos',
     icon: Rss
   }, {
     id: 'messages' as const,
