@@ -26,7 +26,7 @@ import BookConfirm from "./pages/BookConfirm";
 import MyTickets from "./pages/MyTickets";
 import TicketDetails from "./pages/TicketDetails";
 import Cart from "./pages/Cart";
-import TravelBuddies from "./pages/TravelBuddies";
+
 import NotFound from "./pages/NotFound";
 import TravelAgents from "./pages/TravelAgents";
 import LocalGuides from "./pages/LocalGuides";
@@ -71,7 +71,7 @@ const App = () => (
               <Route path="/my-tickets" element={<MyTickets />} />
               <Route path="/ticket-details" element={<TicketDetails />} />
               <Route path="/cart" element={<Cart />} />
-              <Route path="/travel-buddies" element={<TravelBuddies />} />
+              
               <Route path="/book" element={<Book />} />
               <Route path="/travel-agents" element={<TravelAgents />} />
               <Route path="/local-guides" element={<LocalGuides />} />
