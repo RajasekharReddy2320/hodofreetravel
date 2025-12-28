@@ -711,7 +711,7 @@ const Explore = () => {
     icon: Plane
   }, {
     id: 'find-buddies' as const,
-    label: 'Find Buddies',
+    label: 'Find Tramigos',
     icon: Search
   }, {
     id: 'nearby' as const,
