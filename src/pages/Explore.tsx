@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardNav from "@/components/DashboardNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { CreateTravelGroupDialog } from "@/components/CreateTravelGroupDialog";
+import { TravelGroupCard } from "@/components/TravelGroupCard";
 import { PostCard } from "@/components/PostCard";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check, Rss, Palette } from "lucide-react";
+import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check, Rss, Palette, MapPin, Plane } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { z } from "zod";
 import { useHoverRevealSidebar } from "@/hooks/useAutoHideNav";
@@ -53,6 +57,33 @@ interface Conversation {
   user: Profile;
   lastMessage: Message | null;
   unreadCount: number;
+}
+
+interface TravelGroup {
+  id: string;
+  title: string;
+  from_location: string;
+  to_location: string;
+  travel_date: string;
+  travel_mode: string;
+  max_members: number;
+  description: string | null;
+  creator_id: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+  member_count: number;
+}
+
+interface BuddySearchResult {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  interests: string[] | null;
+  home_location: string | null;
+  connection_status: string;
 }
 const MESSAGE_THEMES = [{
   id: 'default',
@@ -99,7 +130,7 @@ const Explore = () => {
   } = useHoverRevealSidebar();
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'feed' | 'connections' | 'messages' | 'saved'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'connections' | 'messages' | 'saved' | 'find-buddies' | 'nearby' | 'travel-with-me' | 'travel-groups'>('feed');
   const [messageTheme, setMessageTheme] = useState('default');
   const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -120,6 +151,15 @@ const Explore = () => {
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
+
+  // Travel Buddies state
+  const [travelGroups, setTravelGroups] = useState<TravelGroup[]>([]);
+  const [userGroupMemberships, setUserGroupMemberships] = useState<Set<string>>(new Set());
+  const [buddySearchQuery, setBuddySearchQuery] = useState("");
+  const [buddyDestination, setBuddyDestination] = useState("");
+  const [buddyInterest, setBuddyInterest] = useState("");
+  const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
+  const [buddySearchLoading, setBuddySearchLoading] = useState(false);
   useEffect(() => {
     checkAuthAndLoad();
   }, []);
@@ -134,8 +174,140 @@ const Explore = () => {
       return;
     }
     setCurrentUserId(session.user.id);
-    await Promise.all([loadPosts(), loadUserInteractions(session.user.id), loadConnections(session.user.id), loadAllUsers(), loadConversations()]);
+    await Promise.all([loadPosts(), loadUserInteractions(session.user.id), loadConnections(session.user.id), loadAllUsers(), loadConversations(), loadTravelGroups(), loadUserGroupMemberships(session.user.id)]);
     setIsLoading(false);
+  };
+
+  // Travel Groups functions
+  const loadTravelGroups = async () => {
+    const { data, error } = await supabase
+      .from("travel_groups")
+      .select(`
+        *,
+        profiles:creator_id (
+          full_name,
+          avatar_url
+        )
+      `)
+      .gte("travel_date", new Date().toISOString().split("T")[0])
+      .order("travel_date", { ascending: true });
+
+    if (error) {
+      console.error("Error loading travel groups:", error);
+      return;
+    }
+
+    const groupsWithCounts = await Promise.all(
+      (data || []).map(async (group: any) => {
+        const { count } = await (supabase as any)
+          .from("travel_group_members")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", group.id)
+          .eq("status", "accepted");
+
+        return { ...group, member_count: count || 0 };
+      })
+    );
+
+    setTravelGroups(groupsWithCounts as any);
+  };
+
+  const loadUserGroupMemberships = async (userId: string) => {
+    const { data } = await supabase
+      .from("travel_group_members")
+      .select("group_id")
+      .eq("user_id", userId)
+      .eq("status", "accepted");
+
+    if (data) {
+      setUserGroupMemberships(new Set(data.map((m) => m.group_id)));
+    }
+  };
+
+  const handleGroupUpdate = () => {
+    loadTravelGroups();
+    if (currentUserId) {
+      loadUserGroupMemberships(currentUserId);
+    }
+  };
+
+  const performBuddySearch = async () => {
+    if (!currentUserId) return;
+    
+    setBuddySearchLoading(true);
+    try {
+      let query = supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", currentUserId);
+
+      if (buddySearchQuery.trim()) {
+        query = query.ilike("full_name", `%${buddySearchQuery}%`);
+      }
+
+      if (buddyDestination.trim()) {
+        query = query.or(`home_location.ilike.%${buddyDestination}%,country.ilike.%${buddyDestination}%,state.ilike.%${buddyDestination}%`);
+      }
+
+      if (buddyInterest) {
+        query = query.contains("interests", [buddyInterest]);
+      }
+
+      const { data: profiles, error } = await query.limit(20);
+
+      if (error) throw error;
+
+      const profilesWithStatus = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: statusData } = await supabase.rpc("get_connection_status", {
+            user1_id: currentUserId,
+            user2_id: profile.id,
+          });
+
+          return {
+            ...profile,
+            connection_status: statusData || "none",
+          };
+        })
+      );
+
+      setBuddySearchResults(profilesWithStatus);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setBuddySearchLoading(false);
+    }
+  };
+
+  const sendBuddyConnectionRequest = async (targetUserId: string) => {
+    if (!currentUserId) return;
+
+    try {
+      const { error } = await supabase.from("user_connections").insert({
+        requester_id: currentUserId,
+        addressee_id: targetUserId,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Request Sent",
+        description: "Connection request sent successfully",
+      });
+
+      performBuddySearch();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   // Posts functions
@@ -422,6 +594,22 @@ const Explore = () => {
     label: 'Connections',
     icon: Users,
     badge: pendingReceived.length
+  }, {
+    id: 'find-buddies' as const,
+    label: 'Find Buddies',
+    icon: Search
+  }, {
+    id: 'nearby' as const,
+    label: 'Nearby',
+    icon: MapPin
+  }, {
+    id: 'travel-with-me' as const,
+    label: 'Travel With Me',
+    icon: UserPlus
+  }, {
+    id: 'travel-groups' as const,
+    label: 'Travel Groups',
+    icon: Plane
   }];
   const profileTabs = [{
     id: 'saved' as const,
@@ -671,6 +859,208 @@ const Explore = () => {
                     <p className="text-muted-foreground">No saved posts yet</p>
                   </div> : posts.filter(p => userSaves.has(p.id)).map(post => <PostCard key={post.id} post={post} currentUserId={currentUserId!} userLiked={userLikes.has(post.id)} userSaved={userSaves.has(post.id)} onUpdate={handlePostUpdate} />)}
               </div>}
+
+            {/* Find Buddies Tab */}
+            {activeTab === 'find-buddies' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Search for Travel Buddies</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4 mb-6">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Search by name..."
+                        value={buddySearchQuery}
+                        onChange={(e) => setBuddySearchQuery(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button onClick={performBuddySearch} disabled={buddySearchLoading}>
+                        <Search className="h-4 w-4 mr-2" />
+                        {buddySearchLoading ? "Searching..." : "Search"}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        placeholder="Filter by destination..."
+                        value={buddyDestination}
+                        onChange={(e) => setBuddyDestination(e.target.value)}
+                      />
+                      <Select value={buddyInterest} onValueChange={setBuddyInterest}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by interest" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="adventure">Adventure</SelectItem>
+                          <SelectItem value="beach">Beach</SelectItem>
+                          <SelectItem value="culture">Culture</SelectItem>
+                          <SelectItem value="food">Food</SelectItem>
+                          <SelectItem value="hiking">Hiking</SelectItem>
+                          <SelectItem value="photography">Photography</SelectItem>
+                          <SelectItem value="wildlife">Wildlife</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {buddySearchResults.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p>Start searching to find travel buddies with similar interests</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {buddySearchResults.map((result) => (
+                        <Card key={result.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar 
+                                className="h-12 w-12 cursor-pointer" 
+                                onClick={() => navigate(`/profile/${result.id}`)}
+                              >
+                                <AvatarImage src={result.avatar_url || undefined} />
+                                <AvatarFallback>{getInitials(result.full_name)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle 
+                                  className="text-base cursor-pointer hover:underline truncate"
+                                  onClick={() => navigate(`/profile/${result.id}`)}
+                                >
+                                  {result.full_name || "Anonymous"}
+                                </CardTitle>
+                                {result.home_location && (
+                                  <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
+                                    <MapPin className="h-3 w-3" />
+                                    {result.home_location}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {result.bio && (
+                              <p className="text-sm text-muted-foreground line-clamp-2">{result.bio}</p>
+                            )}
+                            {result.interests && result.interests.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {result.interests.slice(0, 3).map((int, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {int}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              {result.connection_status === "connected" ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setSelectedUser({ id: result.id, full_name: result.full_name, avatar_url: result.avatar_url });
+                                      setActiveTab('messages');
+                                    }}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                    Message
+                                  </Button>
+                                  <Button variant="outline" size="sm" disabled>
+                                    <UserCheck className="h-4 w-4 mr-1" />
+                                    Connected
+                                  </Button>
+                                </>
+                              ) : result.connection_status === "pending_sent" ? (
+                                <Button variant="outline" size="sm" className="flex-1" disabled>
+                                  Pending
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => sendBuddyConnectionRequest(result.id)}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-1" />
+                                  Connect
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Nearby Tab */}
+            {activeTab === 'nearby' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Travelers Nearby</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <MapPin className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Enable location to find travelers near you</p>
+                    <Button className="mt-4">Enable Location</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Travel With Me Tab */}
+            {activeTab === 'travel-with-me' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Post Your Travel Plans</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Share your travel plans and invite others to join you</p>
+                    <Button className="mt-4">Create Travel Plan</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Travel Groups Tab */}
+            {activeTab === 'travel-groups' && (
+              <>
+                <div className="mb-6 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold">Travel Groups</h2>
+                    <p className="text-muted-foreground">Find travel companions for your next adventure</p>
+                  </div>
+                  <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
+                </div>
+                
+                {travelGroups.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-12 pb-12">
+                      <div className="text-center text-muted-foreground">
+                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                        <p>No travel groups yet. Create one to find travel companions!</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {travelGroups.map((group) => (
+                      <TravelGroupCard
+                        key={group.id}
+                        group={group}
+                        currentUserId={currentUserId!}
+                        isMember={userGroupMemberships.has(group.id)}
+                        onUpdate={handleGroupUpdate}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
