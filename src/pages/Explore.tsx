@@ -13,10 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check, Rss, Palette } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { z } from "zod";
-
-const messageSchema = z.object({
-  content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
-});
+import { useHoverRevealSidebar } from "@/hooks/useAutoHideNav";
 
 interface Post {
   id: string;
@@ -72,9 +69,14 @@ const MESSAGE_THEMES = [
   { id: 'rose', name: 'Rose', primary: 'bg-pink-500', secondary: 'bg-pink-100' },
 ];
 
+const messageSchema = z.object({
+  content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
+});
+
 const Explore = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isSidebarVisible, sidebarProps } = useHoverRevealSidebar();
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'feed' | 'connections' | 'messages' | 'saved'>('feed');
@@ -426,9 +428,14 @@ const Explore = () => {
         </div>
 
         <div className="flex gap-6">
-          {/* Vertical Sidebar Tabs */}
-          <div className="w-16 md:w-48 shrink-0">
-            <div className="sticky top-24 space-y-2">
+          {/* Hover-Reveal Sidebar Tabs */}
+          <div 
+            {...sidebarProps}
+            className={`fixed left-0 top-20 h-[calc(100vh-5rem)] z-40 transition-all duration-300 ease-in-out ${
+              isSidebarVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
+            }`}
+          >
+            <div className="bg-background/95 backdrop-blur-sm border-r shadow-lg h-full p-3 space-y-2 w-48">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -442,7 +449,7 @@ const Explore = () => {
                     }`}
                   >
                     <Icon className="h-5 w-5 shrink-0" />
-                    <span className="hidden md:inline font-medium">{tab.label}</span>
+                    <span className="font-medium">{tab.label}</span>
                     {tab.badge && tab.badge > 0 && (
                       <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                         {tab.badge}
@@ -453,9 +460,15 @@ const Explore = () => {
               })}
             </div>
           </div>
+          
+          {/* Hover trigger zone */}
+          <div 
+            className="fixed left-0 top-20 w-4 h-[calc(100vh-5rem)] z-30"
+            onMouseEnter={() => sidebarProps.onMouseEnter()}
+          />
 
           {/* Main Content Area */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 mx-auto max-w-3xl">
             {/* Feed Tab */}
             {activeTab === 'feed' && (
               <div className="space-y-6">

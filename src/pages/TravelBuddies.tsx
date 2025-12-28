@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, MapPin, Users, UserPlus, MessageCircle, UserCheck, Calendar, Plane } from "lucide-react";
 import { CreateTravelGroupDialog } from "@/components/CreateTravelGroupDialog";
 import { TravelGroupCard } from "@/components/TravelGroupCard";
+import { useHoverRevealSidebar } from "@/hooks/useAutoHideNav";
 
 interface SearchResult {
   id: string;
@@ -49,6 +50,7 @@ const NAV_TABS = [
 
 const TravelBuddies = () => {
   const location = useLocation();
+  const { isSidebarVisible, sidebarProps } = useHoverRevealSidebar();
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'find';
@@ -423,31 +425,43 @@ const TravelBuddies = () => {
     <div className="min-h-screen bg-background">
       <DashboardNav />
       
-      {/* Upper Navigation Bar */}
-      <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-sm border-b">
-        <div className="container mx-auto px-4">
-          <nav className="flex items-center gap-1 overflow-x-auto py-2">
-            {NAV_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                    isActive 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+      {/* Hover-Reveal Left Sidebar */}
+      <div 
+        {...sidebarProps}
+        className={`fixed left-0 top-20 h-[calc(100vh-5rem)] z-40 transition-all duration-300 ease-in-out ${
+          isSidebarVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
+        }`}
+      >
+        <div className="bg-background/95 backdrop-blur-sm border-r shadow-lg h-full p-3 space-y-2 w-52">
+          <div className="px-2 py-3 border-b mb-2">
+            <h2 className="font-semibold text-sm text-muted-foreground">NAVIGATION</h2>
+          </div>
+          {NAV_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
+                  isActive 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
+      
+      {/* Hover trigger zone */}
+      <div 
+        className="fixed left-0 top-20 w-4 h-[calc(100vh-5rem)] z-30"
+        onMouseEnter={() => sidebarProps.onMouseEnter()}
+      />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
