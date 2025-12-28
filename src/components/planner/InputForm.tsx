@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { TripParams } from '@/types/tripPlanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,18 @@ import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles, Plu
 interface InputFormProps {
   onSubmit: (params: TripParams) => void;
   isLoading: boolean;
+  initialValues?: {
+    currentLocation?: string;
+    destination?: string;
+    startDate?: string;
+    endDate?: string;
+    budget?: string;
+  };
+  autoSubmit?: boolean;
+}
+
+export interface InputFormRef {
+  submit: () => void;
 }
 
 const interestOptions = [
@@ -18,16 +30,64 @@ const interestOptions = [
 
 const budgetOptions = ['Budget', 'Mid-Range', 'Luxury'];
 
-const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
-  const [currentLocation, setCurrentLocation] = useState('');
-  const [destination, setDestination] = useState('');
+const InputForm = forwardRef<InputFormRef, InputFormProps>(({ onSubmit, isLoading, initialValues, autoSubmit }, ref) => {
+  const [currentLocation, setCurrentLocation] = useState(initialValues?.currentLocation || '');
+  const [destination, setDestination] = useState(initialValues?.destination || '');
   const [additionalDestinations, setAdditionalDestinations] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(initialValues?.startDate || '');
+  const [endDate, setEndDate] = useState(initialValues?.endDate || '');
   const [travelers, setTravelers] = useState(2);
-  const [budget, setBudget] = useState('');
+  const [budget, setBudget] = useState(initialValues?.budget || '');
   const [interests, setInterests] = useState<string[]>([]);
   const [planMode, setPlanMode] = useState<'tickets' | 'sightseeing' | 'full'>('full');
+  const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
+
+  // Update state when initial values change
+  useEffect(() => {
+    if (initialValues?.currentLocation) setCurrentLocation(initialValues.currentLocation);
+    if (initialValues?.destination) setDestination(initialValues.destination);
+    if (initialValues?.startDate) setStartDate(initialValues.startDate);
+    if (initialValues?.endDate) setEndDate(initialValues.endDate);
+    if (initialValues?.budget) setBudget(initialValues.budget);
+  }, [initialValues]);
+
+  // Auto-submit when ready
+  useEffect(() => {
+    if (autoSubmit && !hasAutoSubmitted && currentLocation && destination && startDate && endDate) {
+      setHasAutoSubmitted(true);
+      const allDestinations = [destination, ...additionalDestinations.filter(d => d.trim())];
+      onSubmit({ 
+        currentLocation, 
+        destination: allDestinations[0],
+        destinations: allDestinations.length > 1 ? allDestinations : undefined,
+        startDate, 
+        endDate, 
+        travelers, 
+        budget: budget || undefined,
+        interests: interests.length > 0 ? interests : undefined,
+        planMode 
+      });
+    }
+  }, [autoSubmit, hasAutoSubmitted, currentLocation, destination, startDate, endDate]);
+
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      if (currentLocation && destination && startDate && endDate) {
+        const allDestinations = [destination, ...additionalDestinations.filter(d => d.trim())];
+        onSubmit({ 
+          currentLocation, 
+          destination: allDestinations[0],
+          destinations: allDestinations.length > 1 ? allDestinations : undefined,
+          startDate, 
+          endDate, 
+          travelers, 
+          budget: budget || undefined,
+          interests: interests.length > 0 ? interests : undefined,
+          planMode 
+        });
+      }
+    }
+  }));
 
   const toggleInterest = (interest: string) => {
     setInterests(prev => 
@@ -352,6 +412,8 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
       </Button>
     </form>
   );
-};
+});
+
+InputForm.displayName = 'InputForm';
 
 export default InputForm;

@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import InputForm from "@/components/planner/InputForm";
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import InputForm, { InputFormRef } from "@/components/planner/InputForm";
 import ItineraryCard from "@/components/planner/ItineraryCard";
 import ItineraryMap from "@/components/planner/ItineraryMap";
 import PlannerCart from "@/components/planner/PlannerCart";
 import { TripParams, TripResponse, ItineraryStep, CartItem, ItineraryHistoryItem } from "@/types/tripPlanner";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Sparkles, PlusCircle, Plane, ArrowLeft, History, Share2, Trash2, ChevronRight } from 'lucide-react';
+import { AlertCircle, Sparkles, PlusCircle, Plane, ArrowLeft, History, Share2, Trash2, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { SharePostDialog } from '@/components/SharePostDialog';
+import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 
 const HISTORY_KEY = 'travexa_itinerary_history';
 
 const PlannerV2 = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { addToCart: addToGlobalCart } = useCart();
   const [tripData, setTripData] = useState<TripResponse | null>(null);
   const [tripDestination, setTripDestination] = useState<string>('');
@@ -30,7 +32,47 @@ const PlannerV2 = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ItineraryHistoryItem[]>([]);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [readAloudEnabled, setReadAloudEnabled] = useState(false);
   const { toast } = useToast();
+  const inputFormRef = useRef<InputFormRef>(null);
+  const { isSpeaking, speak, stop, isSupported: ttsSupported } = useTextToSpeech();
+
+  // Parse URL params
+  const urlDestination = searchParams.get('destination');
+  const urlOrigin = searchParams.get('origin');
+  const urlDays = searchParams.get('days');
+  const urlBudget = searchParams.get('budget');
+  const autoSubmit = searchParams.get('autoSubmit') === 'true';
+  const shouldReadAloud = searchParams.get('readAloud') === 'true';
+
+  // Calculate dates based on URL params
+  const getInitialDates = () => {
+    const today = new Date();
+    const startDate = today.toISOString().split('T')[0];
+    const days = urlDays ? parseInt(urlDays) : 3;
+    const endDateObj = new Date(today);
+    endDateObj.setDate(endDateObj.getDate() + days);
+    const endDate = endDateObj.toISOString().split('T')[0];
+    return { startDate, endDate };
+  };
+
+  const { startDate: initialStartDate, endDate: initialEndDate } = getInitialDates();
+
+  // Map budget string to option
+  const mapBudget = (b: string | null) => {
+    if (!b) return '';
+    if (b === 'low' || b.toLowerCase().includes('budget') || b.toLowerCase().includes('cheap')) return 'Budget';
+    if (b === 'medium' || b.toLowerCase().includes('mid')) return 'Mid-Range';
+    if (b === 'high' || b.toLowerCase().includes('luxury')) return 'Luxury';
+    return '';
+  };
+
+  // Set read aloud from URL
+  useEffect(() => {
+    if (shouldReadAloud) {
+      setReadAloudEnabled(true);
+    }
+  }, [shouldReadAloud]);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -123,6 +165,15 @@ const PlannerV2 = () => {
         title: "Trip Generated!",
         description: `Your ${params.destination} itinerary is ready.`,
       });
+
+      // Read aloud if enabled
+      if (readAloudEnabled && ttsSupported && data.steps) {
+        const textToRead = `Here is your ${data.title}. ` + 
+          data.steps.map((step: ItineraryStep, i: number) => 
+            `Step ${i + 1}: ${step.title}. ${step.description}`
+          ).join('. ');
+        speak(textToRead);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate trip plan";
       setError(message);
@@ -202,10 +253,25 @@ const PlannerV2 = () => {
               <h1 className="text-xl font-bold">Trip Planner</h1>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowHistory(true)}>
-            <History className="h-4 w-4 mr-2" />
-            History
-          </Button>
+          <div className="flex items-center gap-2">
+            {ttsSupported && (
+              <Button
+                variant={readAloudEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (isSpeaking) stop();
+                  setReadAloudEnabled(!readAloudEnabled);
+                }}
+              >
+                {readAloudEnabled ? <Volume2 className="h-4 w-4 mr-2" /> : <VolumeX className="h-4 w-4 mr-2" />}
+                {readAloudEnabled ? 'Read Aloud On' : 'Read Aloud Off'}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowHistory(true)}>
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -285,7 +351,19 @@ const PlannerV2 = () => {
           )}
 
           {/* Input Form */}
-          <InputForm onSubmit={handlePlanTrip} isLoading={isLoading} />
+          <InputForm 
+            ref={inputFormRef}
+            onSubmit={handlePlanTrip} 
+            isLoading={isLoading}
+            initialValues={{
+              currentLocation: urlOrigin || '',
+              destination: urlDestination || '',
+              startDate: urlDestination ? initialStartDate : '',
+              endDate: urlDestination ? initialEndDate : '',
+              budget: mapBudget(urlBudget),
+            }}
+            autoSubmit={autoSubmit && !!urlDestination}
+          />
 
           {/* Error State */}
           {error && (

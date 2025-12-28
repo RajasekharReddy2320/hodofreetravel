@@ -7,6 +7,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { ReducedMotionProvider } from "@/contexts/ReducedMotionContext";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { NotificationInitializer } from "@/components/NotificationInitializer";
+import AIChatBot from "@/components/AIChatBot";
 import Welcome from "./pages/Welcome";
 import Explore from "./pages/Explore";
 import Login from "./pages/Login";
@@ -14,6 +15,7 @@ import Signup from "./pages/Signup";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import PlanTrip from "./pages/PlanTrip";
+import PlannerV2 from "./pages/PlannerV2";
 import Book from "./pages/Book";
 import Profile from "./pages/Profile";
 import UserProfile from "./pages/UserProfile";
@@ -49,6 +51,7 @@ const App = () => (
           <NotificationPermissionBanner />
           <NotificationInitializer />
           <BrowserRouter>
+            <AIChatBot />
             <Routes>
               <Route path="/" element={<Explore />} />
               <Route path="/welcome" element={<Welcome />} />
@@ -57,6 +60,7 @@ const App = () => (
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/plan-trip" element={<Dashboard />} />
               <Route path="/ai-planner" element={<PlanTrip />} />
+              <Route path="/planner" element={<PlannerV2 />} />
               <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
               <Route path="/create-trip" element={<CreateTrip />} />
               <Route path="/profile" element={<Profile />} />
