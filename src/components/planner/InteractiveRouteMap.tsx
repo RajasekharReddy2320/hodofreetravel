@@ -1,223 +1,185 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ItineraryStep } from '@/types/tripPlanner';
-import { MapPin, Navigation, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from "react";
+import { ItineraryStep } from "@/types/tripPlanner";
+import { MapPin, Navigation, Loader2, Route } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface InteractiveRouteMapProps {
   steps: ItineraryStep[];
-  currentLocation?: string;
-  destination?: string;
+  currentLocation?: string; // Optional: Home/Airport origin
+  destination?: string; // Optional: Main city name
 }
 
-interface GeocodedLocation {
-  name: string;
-  lat: number;
-  lng: number;
-}
+const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, currentLocation, destination }) => {
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
-const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ 
-  steps, 
-  currentLocation,
-  destination 
-}) => {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const [locations, setLocations] = useState<GeocodedLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
-  const [mapError, setMapError] = useState(false);
-
-  // Extract unique locations from steps
+  // 1. Logic to extract and clean location names
   const uniqueLocations = steps.reduce((acc, step) => {
+    if (!step.location) return acc;
     const lastLoc = acc.length > 0 ? acc[acc.length - 1] : null;
-    if (step.location && step.location !== lastLoc) {
+    // Filter duplicates
+    if (step.location !== lastLoc) {
       acc.push(step.location);
     }
     return acc;
   }, [] as string[]);
 
-  // Filter to focus on destination area
+  // 2. Filter Logic: Remove Home/Origin to focus on the trip destination
   let displayLocations: string[] = [];
   if (uniqueLocations.length > 1) {
     const startLocation = uniqueLocations[0];
     let trimmed = uniqueLocations.slice(1);
+    // If round trip (starts and ends at home), remove the return leg too
     if (trimmed.length > 0 && trimmed[trimmed.length - 1] === startLocation) {
       trimmed.pop();
     }
-    displayLocations = trimmed;
+    // If we have valid stops left, use them. Otherwise fallback to everything.
+    displayLocations = trimmed.length > 0 ? trimmed : uniqueLocations;
   } else {
     displayLocations = uniqueLocations;
   }
 
-  useEffect(() => {
-    const geocodeLocations = async () => {
-      setLoading(true);
-      try {
-        const geocoded: GeocodedLocation[] = [];
-        
-        for (const loc of displayLocations.slice(0, 10)) { // Limit to 10 locations
-          try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`
-            );
-            const data = await response.json();
-            if (data && data.length > 0) {
-              geocoded.push({
-                name: loc,
-                lat: parseFloat(data[0].lat),
-                lng: parseFloat(data[0].lon),
-              });
-            }
-            // Rate limiting for Nominatim
-            await new Promise(resolve => setTimeout(resolve, 200));
-          } catch (err) {
-            console.error(`Failed to geocode: ${loc}`);
-          }
-        }
-        
-        setLocations(geocoded);
-      } catch (err) {
-        setMapError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (displayLocations.length > 0) {
-      geocodeLocations();
-    } else {
-      setLoading(false);
-    }
-  }, [steps]);
-
-  if (displayLocations.length === 0) {
+  // Fallback: If no locations found in steps, use the generic destination name
+  if (displayLocations.length === 0 && destination) {
+    displayLocations = [destination];
+  } else if (displayLocations.length === 0) {
     return null;
   }
 
-  // Calculate center and bounds for the embedded map
-  const getMapCenter = () => {
-    if (locations.length === 0) {
-      return displayLocations[0] || destination || '';
-    }
-    
-    // Use the first location as center
-    return `${locations[0].lat},${locations[0].lng}`;
-  };
-
-  // Build Google Maps embed URL with markers
+  // 3. Build the URL (The "No API" Magic)
   const buildMapUrl = () => {
-    if (locations.length === 0) {
-      // Fallback to search-based embed
-      const query = displayLocations.slice(0, 3).join(' | ');
-      return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed&z=12`;
+    const baseUrl = "https://maps.google.com/maps";
+
+    // MODE A: Single Location Selected (Interactive Zoom)
+    if (selectedLocation) {
+      return `${baseUrl}?q=${encodeURIComponent(selectedLocation)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
-    if (locations.length === 1) {
-      return `https://maps.google.com/maps?q=${locations[0].lat},${locations[0].lng}&output=embed&z=14`;
+    // MODE B: Full Route View
+    // If only one location exists in total
+    if (displayLocations.length === 1) {
+      return `${baseUrl}?q=${encodeURIComponent(displayLocations[0])}&t=&z=12&ie=UTF8&iwloc=&output=embed`;
     }
 
-    // Create directions URL for multiple locations
-    const origin = encodeURIComponent(locations[0].name);
-    const dest = encodeURIComponent(locations[locations.length - 1].name);
-    const waypoints = locations.slice(1, -1).map(l => encodeURIComponent(l.name)).join('|');
-    
-    if (waypoints) {
-      return `https://maps.google.com/maps?saddr=${origin}&daddr=${dest}&waypoints=${waypoints}&output=embed`;
-    }
-    
-    return `https://maps.google.com/maps?saddr=${origin}&daddr=${dest}&output=embed`;
+    // Route: "from:A to:B to:C"
+    // Limit to 10 stops to prevent URL overflow
+    const safeLocations = displayLocations.slice(0, 10);
+    const start = safeLocations[0];
+    const others = safeLocations.slice(1);
+
+    let queryString = `from:${start}`;
+    others.forEach((loc) => {
+      queryString += `+to:${loc}`;
+    });
+
+    return `${baseUrl}?q=${encodeURIComponent(queryString)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
   };
 
   return (
-    <div className="w-full rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-card">
-      {/* Map Header */}
+    <div className="w-full rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-card transition-all duration-300 hover:shadow-xl">
+      {/* --- Header --- */}
       <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Navigation className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">Trip Route Map</h3>
-          <Badge variant="secondary" className="text-xs">
-            {displayLocations.length} stops
+          {selectedLocation ? (
+            <MapPin className="h-5 w-5 text-primary animate-bounce" />
+          ) : (
+            <Route className="h-5 w-5 text-primary" />
+          )}
+          <h3 className="font-semibold">{selectedLocation ? "Location Detail" : "Trip Route Preview"}</h3>
+          <Badge variant="secondary" className="text-xs ml-2">
+            {displayLocations.length} Stops
           </Badge>
         </div>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading locations...
-          </div>
+
+        {/* Reset Button (Only shows when a filter is active) */}
+        {selectedLocation && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setSelectedLocation(null)}
+          >
+            Show Full Route
+          </Button>
         )}
       </div>
 
-      {/* Location Pills */}
-      <div className="p-3 border-b bg-background overflow-x-auto">
-        <div className="flex gap-2 min-w-max">
-          {displayLocations.map((loc, idx) => (
-            <Button
-              key={idx}
-              variant={selectedLocation === idx ? "default" : "outline"}
-              size="sm"
-              className="gap-1.5 whitespace-nowrap"
-              onClick={() => setSelectedLocation(selectedLocation === idx ? null : idx)}
-            >
-              <MapPin className="h-3 w-3" />
-              <span className="text-xs font-medium">{idx + 1}.</span>
-              {loc}
-            </Button>
-          ))}
+      {/* --- Interactive Pills --- */}
+      <div className="p-3 border-b bg-background overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 min-w-max px-1">
+          {displayLocations.map((loc, idx) => {
+            const isSelected = selectedLocation === loc;
+            return (
+              <Button
+                key={`${loc}-${idx}`}
+                variant={isSelected ? "default" : "outline"}
+                size="sm"
+                className={`gap-1.5 whitespace-nowrap transition-all duration-200 ${isSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
+                onClick={() => setSelectedLocation(isSelected ? null : loc)}
+              >
+                <div
+                  className={`flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold mr-1 ${isSelected ? "bg-white text-primary" : "bg-muted text-muted-foreground"}`}
+                >
+                  {idx + 1}
+                </div>
+                <span className="text-xs font-medium">{loc}</span>
+              </Button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Map Container */}
-      <div className="relative h-[400px] md:h-[450px] bg-muted">
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
+      {/* --- Map Frame --- */}
+      <div className="relative h-[400px] md:h-[450px] bg-muted group">
+        {!iframeLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Preparing route map...</p>
+              <p className="text-sm text-muted-foreground">Loading Map...</p>
             </div>
           </div>
-        ) : mapError ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center p-4">
-              <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">Unable to load map</p>
-            </div>
-          </div>
-        ) : (
-          <iframe
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
-            loading="lazy"
-            allowFullScreen
-            src={buildMapUrl()}
-            title="Trip Route Map"
-            className="grayscale-[10%] hover:grayscale-0 transition-all duration-500"
-          />
         )}
-        
-        {/* Map Overlay Badge */}
-        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full shadow-sm text-muted-foreground pointer-events-none flex items-center gap-1">
+
+        <iframe
+          key={selectedLocation || "route"} // Forces re-render when switching modes
+          width="100%"
+          height="100%"
+          style={{ border: 0, opacity: iframeLoaded ? 1 : 0 }}
+          onLoad={() => setIframeLoaded(true)}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          src={buildMapUrl()}
+          title="Trip Route Map"
+          className="transition-opacity duration-500 w-full h-full grayscale-[10%] group-hover:grayscale-0"
+        />
+
+        {/* Overlay Badge */}
+        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full shadow-sm text-muted-foreground pointer-events-none flex items-center gap-1 border border-border">
           <Navigation className="h-3 w-3" />
-          Interactive Map
+          {selectedLocation ? "Viewing Location" : "Viewing Route"}
         </div>
       </div>
 
-      {/* Route Summary */}
-      {locations.length > 1 && (
-        <div className="p-4 border-t bg-muted/20">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-4 w-4 text-green-500" />
-              <span>{displayLocations[0]}</span>
+      {/* --- Footer Summary --- */}
+      {!selectedLocation && displayLocations.length > 1 && (
+        <div className="p-3 border-t bg-muted/20">
+          <div className="flex items-center gap-3 text-xs md:text-sm">
+            <div className="flex items-center gap-1.5 text-primary font-medium">
+              <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm" />
+              <span className="truncate max-w-[120px]">{displayLocations[0]}</span>
             </div>
+
             <div className="flex-1 h-px bg-border relative">
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
-                {displayLocations.length - 2 > 0 && `+${displayLocations.length - 2} stops`}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-muted px-2 text-[10px] text-muted-foreground border border-border rounded-full">
+                {displayLocations.length - 2 > 0 ? `+${displayLocations.length - 2} stops` : "via"}
               </div>
             </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-4 w-4 text-red-500" />
-              <span>{displayLocations[displayLocations.length - 1]}</span>
+
+            <div className="flex items-center gap-1.5 text-primary font-medium">
+              <span className="truncate max-w-[120px] text-right">{displayLocations[displayLocations.length - 1]}</span>
+              <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm" />
             </div>
           </div>
         </div>
