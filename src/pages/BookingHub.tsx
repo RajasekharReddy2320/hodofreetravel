@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, Clock, TrainFront, Ticket, AlertCircle } from "lucide-react";
+import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, Clock, TrainFront, Ticket, AlertCircle, Lock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { TrainServicesGrid } from "@/components/TrainServicesGrid";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { differenceInHours, parseISO, format } from "date-fns";
+import { useDeveloperMode } from "@/hooks/useDeveloperMode";
 
 const searchSchema = z.object({
   from: z.string().trim().min(2, "Origin must be at least 2 characters").max(100),
@@ -46,6 +47,7 @@ export default function BookingHub() {
   const navigate = useNavigate();
   const { section: urlSection } = useParams<{ section?: string }>();
   const { toast } = useToast();
+  const { isDeveloper, isLoading: isDeveloperLoading } = useDeveloperMode();
   const [activeSection, setActiveSection] = useState<BookingSection>('flights');
   const [showSearchForm, setShowSearchForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -219,12 +221,18 @@ export default function BookingHub() {
     );
   };
 
-  const renderComingSoon = (type: string, emoji: string) => (
+  const renderComingSoon = (type: string, emoji: string, showDevBadge: boolean = false) => (
     <Card className="border-dashed">
       <CardContent className="p-12 text-center">
         <div className="text-6xl mb-4">{emoji}</div>
         <h3 className="text-xl font-semibold mb-2">{type} Booking Coming Soon!</h3>
         <p className="text-muted-foreground">We're working on bringing you the best {type.toLowerCase()} options. Stay tuned!</p>
+        {showDevBadge && (
+          <div className="mt-4 inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">
+            <Lock className="h-3 w-3" />
+            Developer Preview Available
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -311,8 +319,21 @@ export default function BookingHub() {
           </div>
         </div>
 
-        {/* Train Services Grid for Trains tab */}
-        {activeSection === 'trains' && !showSearchForm && <TrainServicesGrid />}
+        {/* Train Services Grid for Trains tab - Developers see full version, users see Coming Soon */}
+        {activeSection === 'trains' && (
+          isDeveloperLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </CardContent>
+            </Card>
+          ) : isDeveloper ? (
+            !showSearchForm && <TrainServicesGrid />
+          ) : (
+            renderComingSoon('Trains', '🚂')
+          )
+        )}
 
         {/* Coming Soon sections */}
         {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
@@ -320,8 +341,8 @@ export default function BookingHub() {
         {activeSection === 'hotels' && renderComingSoon('Hotels', '🏨')}
         {activeSection === 'cabs' && renderComingSoon('Cabs', '🚕')}
 
-        {/* Search Form - Only for flights or trains when search is active */}
-        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && (
+        {/* Search Form - Only for flights or trains when search is active (trains requires developer mode) */}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm && isDeveloper)) && (
           <Card className="mb-8 border-2 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b">
               <CardTitle className="flex items-center gap-2">
@@ -331,6 +352,9 @@ export default function BookingHub() {
                   </span>
                 )}
                 Search {SECTIONS.find(s => s.id === activeSection)?.label}
+                {activeSection === 'trains' && isDeveloper && (
+                  <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-normal">Developer Preview</span>
+                )}
               </CardTitle>
               <CardDescription>Enter your travel details to find the best options</CardDescription>
             </CardHeader>
@@ -363,7 +387,7 @@ export default function BookingHub() {
         )}
 
         {/* Results */}
-        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && renderResults()}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm && isDeveloper)) && renderResults()}
       </main>
     </div>
   );
