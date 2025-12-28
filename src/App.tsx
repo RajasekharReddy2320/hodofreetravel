@@ -38,6 +38,7 @@ import FileTDR from "./pages/trains/FileTDR";
 import ChartVacancy from "./pages/trains/ChartVacancy";
 import TrainSchedule from "./pages/trains/TrainSchedule";
 import TrackTrain from "./pages/trains/TrackTrain";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => (
               <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
               <Route path="/trains/schedule" element={<TrainSchedule />} />
               <Route path="/trains/track-train" element={<TrackTrain />} />
+              <Route path="/admin" element={<AdminDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
