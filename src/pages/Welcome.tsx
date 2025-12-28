@@ -9,7 +9,7 @@ import FloatingParticles from "@/components/FloatingParticles";
 // Import the new component
 import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Plane, Sparkles, Globe, ChevronDown, Ticket, Shield, Users, Zap } from "lucide-react";
+import { Plane, Sparkles, Globe, ChevronDown, Shield, Users, Zap, Ticket } from "lucide-react";
 
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
 
