@@ -706,10 +706,9 @@ const Explore = () => {
     label: 'Messages',
     icon: MessageSquare
   }, {
-    id: 'connections' as const,
-    label: 'Connections',
-    icon: Users,
-    badge: pendingReceived.length
+    id: 'travel-groups' as const,
+    label: 'Travel Groups',
+    icon: Plane
   }, {
     id: 'find-buddies' as const,
     label: 'Find Buddies',
@@ -723,9 +722,10 @@ const Explore = () => {
     label: 'Travel With Me',
     icon: UserPlus
   }, {
-    id: 'travel-groups' as const,
-    label: 'Travel Groups',
-    icon: Plane
+    id: 'connections' as const,
+    label: 'Connections',
+    icon: Users,
+    badge: pendingReceived.length
   }];
   const profileTabs = [{
     id: 'saved' as const,
