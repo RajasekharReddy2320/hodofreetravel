@@ -5,14 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, Clock, TrainFront, Ticket, AlertCircle, Lock } from "lucide-react";
+import { Plane, Train, Bus, Hotel, Car, Search, MapPin, Calendar, Users, TrainFront, Ticket, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { TrainServicesGrid } from "@/components/TrainServicesGrid";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { differenceInHours, parseISO, format } from "date-fns";
-import { useDeveloperMode } from "@/hooks/useDeveloperMode";
 
 const searchSchema = z.object({
   from: z.string().trim().min(2, "Origin must be at least 2 characters").max(100),
@@ -47,7 +46,6 @@ export default function BookingHub() {
   const navigate = useNavigate();
   const { section: urlSection } = useParams<{ section?: string }>();
   const { toast } = useToast();
-  const { isDeveloper, isLoading: isDeveloperLoading } = useDeveloperMode();
   const [activeSection, setActiveSection] = useState<BookingSection>('flights');
   const [showSearchForm, setShowSearchForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -221,21 +219,16 @@ export default function BookingHub() {
     );
   };
 
-  const renderComingSoon = (type: string, emoji: string, showDevBadge: boolean = false) => (
+  const renderComingSoon = (type: string, emoji: string) => (
     <Card className="border-dashed">
       <CardContent className="p-12 text-center">
         <div className="text-6xl mb-4">{emoji}</div>
         <h3 className="text-xl font-semibold mb-2">{type} Booking Coming Soon!</h3>
         <p className="text-muted-foreground">We're working on bringing you the best {type.toLowerCase()} options. Stay tuned!</p>
-        {showDevBadge && (
-          <div className="mt-4 inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">
-            <Lock className="h-3 w-3" />
-            Developer Preview Available
-          </div>
-        )}
       </CardContent>
     </Card>
   );
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
@@ -319,117 +312,17 @@ export default function BookingHub() {
           </div>
         </div>
 
-        {/* Train Services Grid for Trains tab - Developers see full version, users see Coming Soon */}
-        {activeSection === 'trains' && (
-          isDeveloperLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading...</p>
-              </CardContent>
-            </Card>
-          ) : isDeveloper ? (
-            !showSearchForm && <TrainServicesGrid />
-          ) : (
-            renderComingSoon('Trains', '🚂')
-          )
-        )}
+        {/* Train Services Grid for Trains tab */}
+        {activeSection === 'trains' && !showSearchForm && <TrainServicesGrid />}
 
-        {/* Coming Soon sections - Developers see placeholder for dev features */}
+        {/* Coming Soon sections */}
         {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
-        {activeSection === 'buses' && (
-          isDeveloperLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading...</p>
-              </CardContent>
-            </Card>
-          ) : isDeveloper ? (
-            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
-              <CardContent className="p-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
-                </div>
-                <div className="text-center py-8">
-                  <Bus className="h-16 w-16 mx-auto mb-4 text-amber-600" />
-                  <h3 className="text-xl font-semibold mb-2">Bus Booking - Developer Preview</h3>
-                  <p className="text-muted-foreground mb-4">This feature is under development. Search functionality coming soon.</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Route Search</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Seat Selection</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Live Tracking</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            renderComingSoon('Buses', '🚌')
-          )
-        )}
-        {activeSection === 'hotels' && (
-          isDeveloperLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading...</p>
-              </CardContent>
-            </Card>
-          ) : isDeveloper ? (
-            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
-              <CardContent className="p-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
-                </div>
-                <div className="text-center py-8">
-                  <Hotel className="h-16 w-16 mx-auto mb-4 text-amber-600" />
-                  <h3 className="text-xl font-semibold mb-2">Hotel Booking - Developer Preview</h3>
-                  <p className="text-muted-foreground mb-4">This feature is under development. Search functionality coming soon.</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Room Search</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Price Comparison</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Reviews</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            renderComingSoon('Hotels', '🏨')
-          )
-        )}
-        {activeSection === 'cabs' && (
-          isDeveloperLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading...</p>
-              </CardContent>
-            </Card>
-          ) : isDeveloper ? (
-            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
-              <CardContent className="p-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
-                </div>
-                <div className="text-center py-8">
-                  <Car className="h-16 w-16 mx-auto mb-4 text-amber-600" />
-                  <h3 className="text-xl font-semibold mb-2">Cab Booking - Developer Preview</h3>
-                  <p className="text-muted-foreground mb-4">This feature is under development. Ride booking coming soon.</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Ride Booking</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Live Tracking</span>
-                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Fare Estimate</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            renderComingSoon('Cabs', '🚕')
-          )
-        )}
+        {activeSection === 'buses' && renderComingSoon('Buses', '🚌')}
+        {activeSection === 'hotels' && renderComingSoon('Hotels', '🏨')}
+        {activeSection === 'cabs' && renderComingSoon('Cabs', '🚕')}
 
-        {/* Search Form - Only for flights or trains when search is active (trains requires developer mode) */}
-        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm && isDeveloper)) && (
+        {/* Search Form - Only for flights or trains when search is active */}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && (
           <Card className="mb-8 border-2 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b">
               <CardTitle className="flex items-center gap-2">
@@ -439,9 +332,6 @@ export default function BookingHub() {
                   </span>
                 )}
                 Search {SECTIONS.find(s => s.id === activeSection)?.label}
-                {activeSection === 'trains' && isDeveloper && (
-                  <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-normal">Developer Preview</span>
-                )}
               </CardTitle>
               <CardDescription>Enter your travel details to find the best options</CardDescription>
             </CardHeader>
@@ -474,7 +364,7 @@ export default function BookingHub() {
         )}
 
         {/* Results */}
-        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm && isDeveloper)) && renderResults()}
+        {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm)) && renderResults()}
       </main>
     </div>
   );
