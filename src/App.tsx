@@ -54,6 +54,7 @@ const App = () => (
             <AIChatBot />
             <Routes>
               <Route path="/" element={<Explore />} />
+              <Route path="/explore/:tab?" element={<Explore />} />
               <Route path="/welcome" element={<Welcome />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/profile/:userId" element={<UserProfile />} />
               <Route path="/search" element={<SearchUsers />} />
               <Route path="/book-transport" element={<BookingHub />} />
+              <Route path="/book-transport/:section?" element={<BookingHub />} />
               <Route path="/book-confirm" element={<BookConfirm />} />
               <Route path="/my-tickets" element={<MyTickets />} />
               <Route path="/ticket-details" element={<TicketDetails />} />

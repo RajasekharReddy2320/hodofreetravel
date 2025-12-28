@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,8 +119,13 @@ const MESSAGE_THEMES = [{
 const messageSchema = z.object({
   content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
 });
+type TabType = 'feed' | 'connections' | 'messages' | 'saved' | 'find-buddies' | 'nearby' | 'travel-with-me' | 'travel-groups';
+
+const VALID_TABS: TabType[] = ['feed', 'connections', 'messages', 'saved', 'find-buddies', 'nearby', 'travel-with-me', 'travel-groups'];
+
 const Explore = () => {
   const navigate = useNavigate();
+  const { tab } = useParams<{ tab?: string }>();
   const {
     toast
   } = useToast();
@@ -130,9 +135,28 @@ const Explore = () => {
   } = useHoverRevealSidebar();
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'feed' | 'connections' | 'messages' | 'saved' | 'find-buddies' | 'nearby' | 'travel-with-me' | 'travel-groups'>('feed');
+  const [activeTab, setActiveTab] = useState<TabType>('feed');
   const [messageTheme, setMessageTheme] = useState('default');
   const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Nearby travelers state
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyTravelers, setNearbyTravelers] = useState<BuddySearchResult[]>([]);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Sync tab from URL
+  useEffect(() => {
+    if (tab && VALID_TABS.includes(tab as TabType)) {
+      setActiveTab(tab as TabType);
+    }
+  }, [tab]);
+
+  // Update URL when tab changes
+  const handleTabChange = (newTab: TabType) => {
+    setActiveTab(newTab);
+    navigate(`/explore/${newTab}`, { replace: true });
+  };
 
   // Posts state
   const [posts, setPosts] = useState<Post[]>([]);
@@ -301,6 +325,98 @@ const Explore = () => {
       });
 
       performBuddySearch();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Geolocation and nearby travelers
+  const requestLocation = async () => {
+    setLocationError(null);
+    setNearbyLoading(true);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setNearbyLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        await loadNearbyTravelers(latitude, longitude);
+        setNearbyLoading(false);
+      },
+      (error) => {
+        setNearbyLoading(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError("Location permission denied. Please enable it in your browser settings.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError("Location information is unavailable.");
+            break;
+          case error.TIMEOUT:
+            setLocationError("Location request timed out.");
+            break;
+          default:
+            setLocationError("An unknown error occurred.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  const loadNearbyTravelers = async (lat: number, lng: number) => {
+    if (!currentUserId) return;
+
+    try {
+      // For now, load users from similar locations/countries
+      // In production, you'd use PostGIS for distance calculations
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("country, state, home_location")
+        .eq("id", currentUserId)
+        .single();
+
+      let query = supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", currentUserId);
+
+      // Filter by same country/state if available
+      if (userProfile?.country) {
+        query = query.eq("country", userProfile.country);
+      }
+
+      const { data: profiles, error } = await query.limit(20);
+
+      if (error) throw error;
+
+      const profilesWithStatus = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: statusData } = await supabase.rpc("get_connection_status", {
+            user1_id: currentUserId,
+            user2_id: profile.id,
+          });
+
+          return {
+            ...profile,
+            connection_status: statusData || "none",
+          };
+        })
+      );
+
+      setNearbyTravelers(profilesWithStatus);
+      toast({
+        title: "Location enabled",
+        description: `Found ${profilesWithStatus.length} travelers in your area`,
+      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -629,13 +745,13 @@ const Explore = () => {
           <div {...sidebarProps} className={`fixed left-0 top-20 h-[calc(100vh-5rem)] z-40 transition-all duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'}`}>
             <div className="bg-background/95 backdrop-blur-sm border-r shadow-lg h-full p-3 space-y-2 w-48 flex flex-col">
               <div className="space-y-2 flex-1">
-                {tabs.map(tab => {
-                const Icon = tab.icon;
-                return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-primary text-primary-foreground shadow-lg' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
+                {tabs.map(tabItem => {
+                const Icon = tabItem.icon;
+                return <button key={tabItem.id} onClick={() => handleTabChange(tabItem.id)} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${activeTab === tabItem.id ? 'bg-primary text-primary-foreground shadow-lg' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
                       <Icon className="h-5 w-5 shrink-0" />
-                      <span className="font-medium">{tab.label}</span>
-                      {tab.badge && tab.badge > 0 && <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {tab.badge}
+                      <span className="font-medium">{tabItem.label}</span>
+                      {tabItem.badge && tabItem.badge > 0 && <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {tabItem.badge}
                         </span>}
                     </button>;
               })}
@@ -998,14 +1114,132 @@ const Explore = () => {
             {activeTab === 'nearby' && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Travelers Nearby</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    Travelers Nearby
+                  </CardTitle>
+                  {userLocation && (
+                    <p className="text-sm text-muted-foreground">
+                      Location enabled • Showing travelers in your area
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12 text-muted-foreground">
-                    <MapPin className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p>Enable location to find travelers near you</p>
-                    <Button className="mt-4">Enable Location</Button>
-                  </div>
+                  {!userLocation ? (
+                    <div className="text-center py-12">
+                      <MapPin className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="text-lg font-semibold mb-2">Enable Location</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Allow location access to find travelers near you
+                      </p>
+                      {locationError && (
+                        <p className="text-sm text-destructive mb-4">{locationError}</p>
+                      )}
+                      <Button onClick={requestLocation} disabled={nearbyLoading}>
+                        {nearbyLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                            Getting location...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Enable Location
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : nearbyTravelers.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p>No travelers found in your area yet</p>
+                      <Button variant="outline" className="mt-4" onClick={() => requestLocation()}>
+                        Refresh
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {nearbyTravelers.map((traveler) => (
+                        <Card key={traveler.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar 
+                                className="h-12 w-12 cursor-pointer" 
+                                onClick={() => navigate(`/profile/${traveler.id}`)}
+                              >
+                                <AvatarImage src={traveler.avatar_url || undefined} />
+                                <AvatarFallback>{getInitials(traveler.full_name)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle 
+                                  className="text-base cursor-pointer hover:underline truncate"
+                                  onClick={() => navigate(`/profile/${traveler.id}`)}
+                                >
+                                  {traveler.full_name || "Anonymous"}
+                                </CardTitle>
+                                {traveler.home_location && (
+                                  <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
+                                    <MapPin className="h-3 w-3" />
+                                    {traveler.home_location}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {traveler.bio && (
+                              <p className="text-sm text-muted-foreground line-clamp-2">{traveler.bio}</p>
+                            )}
+                            {traveler.interests && traveler.interests.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {traveler.interests.slice(0, 3).map((int, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {int}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              {traveler.connection_status === "connected" ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setSelectedUser({ id: traveler.id, full_name: traveler.full_name, avatar_url: traveler.avatar_url });
+                                      handleTabChange('messages');
+                                    }}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                    Message
+                                  </Button>
+                                  <Button variant="outline" size="sm" disabled>
+                                    <UserCheck className="h-4 w-4 mr-1" />
+                                    Connected
+                                  </Button>
+                                </>
+                              ) : traveler.connection_status === "pending_sent" ? (
+                                <Button variant="outline" size="sm" className="flex-1" disabled>
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  Pending
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => sendBuddyConnectionRequest(traveler.id)}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-1" />
+                                  Connect
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

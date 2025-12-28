@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "@/components/DashboardNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,7 @@ interface UpcomingBooking {
 
 export default function BookingHub() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { section: urlSection } = useParams<{ section?: string }>();
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<BookingSection>('flights');
   const [showSearchForm, setShowSearchForm] = useState(false);
@@ -68,18 +68,23 @@ export default function BookingHub() {
   const [trains, setTrains] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
 
-  // Check URL params for section and action
+  // Sync section from URL
   useEffect(() => {
-    const section = searchParams.get('section') as BookingSection;
-    const action = searchParams.get('action');
-    
-    if (section && SECTIONS.some(s => s.id === section)) {
-      setActiveSection(section);
+    if (urlSection && SECTIONS.some(s => s.id === urlSection)) {
+      setActiveSection(urlSection as BookingSection);
     }
-    if (action === 'search') {
-      setShowSearchForm(true);
-    }
-  }, [searchParams]);
+  }, [urlSection]);
+
+  // Update URL when section changes
+  const handleSectionChange = (section: BookingSection) => {
+    setActiveSection(section);
+    setShowSearchForm(false);
+    navigate(`/book-transport/${section}`, { replace: true });
+    // Clear results when switching sections
+    setFlights([]);
+    setTrains([]);
+    setBuses([]);
+  };
 
   // Check for upcoming journeys within 4 hours on page load
   useEffect(() => {
@@ -223,16 +228,6 @@ export default function BookingHub() {
       </CardContent>
     </Card>
   );
-
-  const handleSectionChange = (section: BookingSection) => {
-    setActiveSection(section);
-    setShowSearchForm(false);
-    // Clear results when switching sections
-    setFlights([]);
-    setTrains([]);
-    setBuses([]);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
