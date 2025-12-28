@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Wallet, Clock, CheckCircle, XCircle, Plus, Minus, CreditCard, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -43,13 +43,6 @@ interface Profile {
   is_public: boolean;
 }
 
-interface WalletTransaction {
-  id: string;
-  type: 'credit' | 'debit';
-  amount: number;
-  description: string;
-  date: string;
-}
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -67,16 +60,8 @@ const Profile = () => {
   const [canMessage, setCanMessage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   
-  // Wallet state
-  const [walletBalance, setWalletBalance] = useState(2500);
-  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([
-    { id: '1', type: 'credit', amount: 5000, description: 'Added via UPI', date: '2024-12-20' },
-    { id: '2', type: 'debit', amount: 1200, description: 'Train Booking - Delhi to Mumbai', date: '2024-12-22' },
-    { id: '3', type: 'debit', amount: 800, description: 'Bus Booking - Mumbai to Pune', date: '2024-12-23' },
-    { id: '4', type: 'credit', amount: 500, description: 'Refund - Cancelled Ticket', date: '2024-12-24' },
-  ]);
-  const [showAddMoneyDialog, setShowAddMoneyDialog] = useState(false);
-  const [addAmount, setAddAmount] = useState("");
+  // Saved posts state
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("posts");
   
   // Review state
@@ -302,7 +287,23 @@ const Profile = () => {
       ]);
 
       if (likesData.data) setUserLikes(new Set(likesData.data.map((l: any) => l.post_id)));
-      if (savesData.data) setUserSaves(new Set(savesData.data.map((s: any) => s.post_id)));
+      if (savesData.data) {
+        setUserSaves(new Set(savesData.data.map((s: any) => s.post_id)));
+        
+        // Fetch saved posts details
+        const savedPostIds = savesData.data.map((s: any) => s.post_id);
+        if (savedPostIds.length > 0) {
+          const { data: savedPostsData } = await supabase
+            .from("posts")
+            .select(`*, profiles:user_id (full_name, avatar_url)`)
+            .in("id", savedPostIds)
+            .order("created_at", { ascending: false });
+          
+          if (savedPostsData) {
+            setSavedPosts(savedPostsData);
+          }
+        }
+      }
       if (membershipsData.data) setUserGroupMemberships(new Set(membershipsData.data.map((m: any) => m.group_id)));
     }
   };
@@ -440,27 +441,6 @@ const Profile = () => {
     }
   };
 
-  const handleAddMoney = () => {
-    const amount = parseFloat(addAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Invalid amount", variant: "destructive" });
-      return;
-    }
-    
-    const newTransaction: WalletTransaction = {
-      id: Date.now().toString(),
-      type: 'credit',
-      amount: amount,
-      description: 'Added via UPI',
-      date: new Date().toISOString().split('T')[0]
-    };
-    
-    setWalletTransactions(prev => [newTransaction, ...prev]);
-    setWalletBalance(prev => prev + amount);
-    setShowAddMoneyDialog(false);
-    setAddAmount("");
-    toast({ title: "Money Added!", description: `₹${amount.toLocaleString()} added to wallet` });
-  };
 
   const getInitials = (name: string | null) => {
     if (!name) return "U";
@@ -536,37 +516,6 @@ const Profile = () => {
     <div className="min-h-screen bg-background">
       <DashboardNav />
 
-      {/* Add Money Dialog */}
-      <Dialog open={showAddMoneyDialog} onOpenChange={setShowAddMoneyDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Money to Wallet</DialogTitle>
-            <DialogDescription>Enter the amount you want to add</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Amount (₹)</Label>
-              <Input
-                type="number"
-                placeholder="Enter amount"
-                value={addAmount}
-                onChange={(e) => setAddAmount(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {[500, 1000, 2000, 5000].map(amt => (
-                <Button key={amt} variant="outline" size="sm" onClick={() => setAddAmount(amt.toString())}>
-                  +₹{amt}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMoneyDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddMoney}>Add Money</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <main className="max-w-4xl mx-auto pb-20">
         {/* Instagram-style Profile Header */}
@@ -700,15 +649,15 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </Link>
-              <div className="group cursor-pointer" onClick={() => setActiveTab("wallet")}>
-                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10 hover:scale-[1.02]">
+              <div className="group cursor-pointer" onClick={() => setActiveTab("saved")}>
+                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-red-500/10 hover:scale-[1.02]">
                   <CardContent className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
-                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg">
-                      <Wallet className="h-5 w-5 md:h-6 md:w-6" />
+                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 text-white shadow-lg">
+                      <Bookmark className="h-5 w-5 md:h-6 md:w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Wallet</h3>
-                      <p className="text-xs text-muted-foreground hidden md:block">₹{walletBalance.toLocaleString()}</p>
+                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Saved</h3>
+                      <p className="text-xs text-muted-foreground hidden md:block">{savedPosts.length} posts</p>
                     </div>
                     <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-hover:translate-x-1 transition-transform hidden sm:block" />
                   </CardContent>
@@ -739,9 +688,9 @@ const Profile = () => {
                 <span className="hidden md:inline">Tickets</span>
               </TabsTrigger>
               {isOwnProfile && (
-                <TabsTrigger value="wallet" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Wallet className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Wallet</span>
+                <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Bookmark className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Saved</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -945,100 +894,37 @@ const Profile = () => {
               })()}
             </TabsContent>
 
-            {/* Wallet Tab */}
+            {/* Saved Tab */}
             {isOwnProfile && (
-              <TabsContent value="wallet" className="mt-6 space-y-6">
-                {/* Wallet Balance Card */}
-                <Card className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white border-0 overflow-hidden relative">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12" />
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-white/20 rounded-xl">
-                          <Wallet className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <p className="text-white/80 text-sm">Travel Wallet</p>
-                          <p className="text-3xl font-bold">₹{walletBalance.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <Button 
-                        variant="secondary" 
-                        className="bg-white/20 hover:bg-white/30 text-white border-0"
-                        onClick={() => setShowAddMoneyDialog(true)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Money
-                      </Button>
-                    </div>
-                    <p className="text-white/70 text-sm">Use your wallet balance to book tickets faster</p>
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => setShowAddMoneyDialog(true)}>
-                    <CardContent className="p-4 flex flex-col items-center text-center">
-                      <div className="p-3 rounded-xl bg-green-100 mb-2">
-                        <Plus className="h-5 w-5 text-green-600" />
-                      </div>
-                      <span className="text-sm font-medium">Add Money</span>
-                    </CardContent>
-                  </Card>
-                  <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => navigate("/book-transport")}>
-                    <CardContent className="p-4 flex flex-col items-center text-center">
-                      <div className="p-3 rounded-xl bg-blue-100 mb-2">
-                        <CreditCard className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <span className="text-sm font-medium">Pay with Wallet</span>
-                    </CardContent>
-                  </Card>
-                  <Card className="cursor-pointer hover:shadow-md transition-all opacity-50">
-                    <CardContent className="p-4 flex flex-col items-center text-center">
-                      <div className="p-3 rounded-xl bg-purple-100 mb-2">
-                        <ArrowUpRight className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <span className="text-sm font-medium">Transfer</span>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Transaction History */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Transaction History</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {walletTransactions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <CreditCard className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                        <p>No transactions yet</p>
-                      </div>
-                    ) : (
-                      walletTransactions.map((txn) => (
-                        <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${txn.type === 'credit' ? 'bg-green-100' : 'bg-red-100'}`}>
-                              {txn.type === 'credit' ? (
-                                <ArrowDownLeft className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <ArrowUpRight className="h-4 w-4 text-red-600" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{txn.description}</p>
-                              <p className="text-xs text-muted-foreground">{txn.date}</p>
-                            </div>
+              <TabsContent value="saved" className="mt-6 space-y-6">
+                {savedPosts.length === 0 ? (
+                  <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                    <Bookmark className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                    <h3 className="font-semibold text-lg mb-1">No saved posts</h3>
+                    <p className="text-muted-foreground text-sm">Posts you save will appear here</p>
+                    <Button className="mt-4" onClick={() => navigate("/explore")}>
+                      Explore Posts
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1 md:gap-3">
+                    {savedPosts.map((post) => (
+                      <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                        {post.image_url ? (
+                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                            <p className="text-xs text-center line-clamp-4">{post.content}</p>
                           </div>
-                          <span className={`font-semibold ${txn.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                            {txn.type === 'credit' ? '+' : '-'}₹{txn.amount.toLocaleString()}
-                          </span>
+                        )}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
                         </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             )}
           </Tabs>
