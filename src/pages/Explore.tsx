@@ -413,8 +413,11 @@ const Explore = () => {
 
   const tabs = [
     { id: 'feed' as const, label: 'Feed', icon: Rss },
-    { id: 'connections' as const, label: 'Connections', icon: Users, badge: pendingReceived.length },
     { id: 'messages' as const, label: 'Messages', icon: MessageSquare },
+    { id: 'connections' as const, label: 'Connections', icon: Users, badge: pendingReceived.length },
+  ];
+
+  const profileTabs = [
     { id: 'saved' as const, label: 'Saved', icon: Bookmark },
   ];
 
@@ -435,29 +438,53 @@ const Explore = () => {
               isSidebarVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
             }`}
           >
-            <div className="bg-background/95 backdrop-blur-sm border-r shadow-lg h-full p-3 space-y-2 w-48">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-primary text-primary-foreground shadow-lg'
-                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <span className="font-medium">{tab.label}</span>
-                    {tab.badge && tab.badge > 0 && (
-                      <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="bg-background/95 backdrop-blur-sm border-r shadow-lg h-full p-3 space-y-2 w-48 flex flex-col">
+              <div className="space-y-2 flex-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-primary text-primary-foreground shadow-lg'
+                          : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span className="font-medium">{tab.label}</span>
+                      {tab.badge && tab.badge > 0 && (
+                        <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Profile Section */}
+              <div className="border-t pt-3 mt-auto space-y-2">
+                <span className="text-xs text-muted-foreground px-3 uppercase tracking-wider">Profile</span>
+                {profileTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-primary text-primary-foreground shadow-lg'
+                          : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span className="font-medium">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
           
