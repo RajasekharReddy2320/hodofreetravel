@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles, Plus } from 'lucide-react';
+import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles, Plus, LocateFixed } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface InputFormProps {
   onSubmit: (params: TripParams) => void;
@@ -41,6 +42,64 @@ const InputForm = forwardRef<InputFormRef, InputFormProps>(({ onSubmit, isLoadin
   const [interests, setInterests] = useState<string[]>([]);
   const [planMode, setPlanMode] = useState<'tickets' | 'sightseeing' | 'full'>('full');
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const { toast } = useToast();
+
+  // Auto-detect location on mount if no initial location
+  useEffect(() => {
+    if (!initialValues?.currentLocation && !currentLocation && navigator.geolocation) {
+      detectLocation();
+    }
+  }, []);
+
+  const detectLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Geolocation not supported", variant: "destructive" });
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          // Use reverse geocoding to get city name
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+          );
+          const data = await response.json();
+          
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county;
+          const state = data.address?.state;
+          const country = data.address?.country;
+          
+          const locationName = [city, state, country].filter(Boolean).join(', ');
+          
+          if (locationName) {
+            setCurrentLocation(locationName);
+            toast({ title: "Location detected", description: locationName });
+          }
+        } catch (error) {
+          console.error('Reverse geocoding failed:', error);
+        } finally {
+          setIsDetectingLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        setIsDetectingLocation(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast({ 
+            title: "Location access denied", 
+            description: "Please enter your location manually",
+            variant: "destructive" 
+          });
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // Update state when initial values change
   useEffect(() => {
@@ -231,14 +290,32 @@ const InputForm = forwardRef<InputFormRef, InputFormProps>(({ onSubmit, isLoadin
           <MapPin size={16} className="text-primary" />
           Current Location (Departure City)
         </Label>
-        <Input
-          type="text"
-          placeholder="e.g., Mumbai, India"
-          value={currentLocation}
-          onChange={(e) => setCurrentLocation(e.target.value)}
-          className="bg-background rounded-xl"
-          required
-        />
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            placeholder={isDetectingLocation ? "Detecting your location..." : "e.g., Mumbai, India"}
+            value={currentLocation}
+            onChange={(e) => setCurrentLocation(e.target.value)}
+            className="bg-background rounded-xl flex-1"
+            required
+            disabled={isDetectingLocation}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={detectLocation}
+            disabled={isDetectingLocation}
+            className="shrink-0 rounded-xl"
+            title="Detect my location"
+          >
+            {isDetectingLocation ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LocateFixed className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Destination with Multi-Destination Support */}

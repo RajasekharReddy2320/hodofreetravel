@@ -16,13 +16,14 @@ interface Message {
 }
 
 interface ParsedIntent {
-  action: 'plan_trip' | 'book_train' | 'book_flight' | 'book_bus' | 'navigate' | 'unknown';
+  action: 'plan_trip' | 'book_train' | 'book_flight' | 'book_bus' | 'navigate' | 'show_bookings' | 'check_pnr' | 'find_buddies' | 'show_tickets' | 'explore_posts' | 'unknown';
   params: {
     destination?: string;
     origin?: string;
     days?: number;
     budget?: string;
     page?: string;
+    pnr?: string;
   };
 }
 
@@ -32,7 +33,7 @@ const AIChatBot = () => {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm your TraveXa assistant. You can ask me to plan trips, book tickets, or navigate the app. Try saying 'Plan a trip to Jaipur for 2 days on a low budget' or type your request.",
+      content: "Hi! I'm your TraveXa assistant. Try:\n• 'Plan a trip to Jaipur for 2 days'\n• 'Show my bookings'\n• 'Check PNR 1234567890'\n• 'Find travel buddies to Goa'\n• 'Book a train'",
     },
   ]);
   const [input, setInput] = useState('');
@@ -105,14 +106,48 @@ const AIChatBot = () => {
       return { action: 'book_bus', params: {} };
     }
 
+    // Show bookings
+    if ((lowerText.includes('show') || lowerText.includes('view') || lowerText.includes('my')) && 
+        (lowerText.includes('booking') || lowerText.includes('reservation'))) {
+      return { action: 'show_bookings', params: {} };
+    }
+
+    // Show tickets
+    if ((lowerText.includes('show') || lowerText.includes('view') || lowerText.includes('my')) && 
+        lowerText.includes('ticket')) {
+      return { action: 'show_tickets', params: {} };
+    }
+
+    // Check PNR
+    const pnrMatch = lowerText.match(/(?:check|pnr|status)\s*(?:pnr)?\s*(\d{10})/i) || 
+                     lowerText.match(/(\d{10})/);
+    if (lowerText.includes('pnr') || lowerText.includes('status')) {
+      return { action: 'check_pnr', params: { pnr: pnrMatch?.[1] } };
+    }
+
+    // Find travel buddies
+    if ((lowerText.includes('find') || lowerText.includes('search')) && 
+        (lowerText.includes('buddy') || lowerText.includes('buddies') || lowerText.includes('companion') || lowerText.includes('partner'))) {
+      const buddyDestMatch = lowerText.match(/(?:to|for|going)\s+([a-zA-Z\s]+?)(?:\s|$)/i);
+      return { action: 'find_buddies', params: { destination: buddyDestMatch?.[1]?.trim() } };
+    }
+
+    // Explore posts/feed
+    if (lowerText.includes('explore') || lowerText.includes('feed') || lowerText.includes('posts')) {
+      return { action: 'explore_posts', params: {} };
+    }
+
     // Navigation patterns
-    if (lowerText.includes('go to') || lowerText.includes('open') || lowerText.includes('show') || lowerText.includes('navigate')) {
+    if (lowerText.includes('go to') || lowerText.includes('open') || lowerText.includes('navigate')) {
       if (lowerText.includes('home')) return { action: 'navigate', params: { page: '/' } };
       if (lowerText.includes('profile')) return { action: 'navigate', params: { page: '/profile' } };
       if (lowerText.includes('explore')) return { action: 'navigate', params: { page: '/explore' } };
       if (lowerText.includes('booking') || lowerText.includes('book')) return { action: 'navigate', params: { page: '/booking-hub' } };
       if (lowerText.includes('dashboard')) return { action: 'navigate', params: { page: '/dashboard' } };
       if (lowerText.includes('trip') || lowerText.includes('planner')) return { action: 'navigate', params: { page: '/planner' } };
+      if (lowerText.includes('buddies') || lowerText.includes('travel buddy')) return { action: 'navigate', params: { page: '/travel-buddies' } };
+      if (lowerText.includes('cart')) return { action: 'navigate', params: { page: '/cart' } };
+      if (lowerText.includes('photo') || lowerText.includes('vault')) return { action: 'navigate', params: { page: '/photo-vault' } };
     }
 
     return { action: 'unknown', params: {} };
@@ -153,16 +188,53 @@ const AIChatBot = () => {
         setIsOpen(false);
         return "Taking you to the bus booking section. Find your perfect ride!";
 
+      case 'show_bookings':
+        navigate('/profile?tab=bookings');
+        setIsOpen(false);
+        return "Opening your bookings. You can view all your upcoming and past reservations there!";
+
+      case 'show_tickets':
+        navigate('/my-tickets');
+        setIsOpen(false);
+        return "Opening your tickets. Here you can see all your booked tickets!";
+
+      case 'check_pnr':
+        if (intent.params.pnr) {
+          navigate(`/trains/pnr-enquiry?pnr=${intent.params.pnr}`);
+        } else {
+          navigate('/trains/pnr-enquiry');
+        }
+        setIsOpen(false);
+        return intent.params.pnr 
+          ? `Checking PNR status for ${intent.params.pnr}. The status will be displayed shortly!`
+          : "Opening PNR enquiry page. Enter your 10-digit PNR number to check status.";
+
+      case 'find_buddies':
+        if (intent.params.destination) {
+          navigate(`/travel-buddies?destination=${encodeURIComponent(intent.params.destination)}`);
+        } else {
+          navigate('/travel-buddies');
+        }
+        setIsOpen(false);
+        return intent.params.destination
+          ? `Finding travel buddies heading to ${intent.params.destination}. Connect with fellow travelers!`
+          : "Opening travel buddies page. Find companions for your next adventure!";
+
+      case 'explore_posts':
+        navigate('/');
+        setIsOpen(false);
+        return "Opening the explore feed. Discover amazing travel stories and inspiration!";
+
       case 'navigate':
         if (intent.params.page) {
           navigate(intent.params.page);
           setIsOpen(false);
-          return `Navigating to ${intent.params.page === '/' ? 'home' : intent.params.page.replace('/', '')} page.`;
+          return `Navigating to ${intent.params.page === '/' ? 'home' : intent.params.page.replace(/\//g, ' ').trim()} page.`;
         }
         return "I couldn't understand where you want to go.";
 
       default:
-        return "I'm sorry, I didn't understand that. You can ask me to:\n• Plan a trip (e.g., 'Plan a trip to Goa for 3 days')\n• Book trains, flights, or buses\n• Navigate to different pages";
+        return "I can help you with:\n• 'Plan a trip to [place] for [X] days'\n• 'Show my bookings' or 'Show my tickets'\n• 'Check PNR 1234567890'\n• 'Find travel buddies to [place]'\n• 'Book a train/flight/bus'\n• 'Go to profile/cart/photo vault'";
     }
   };
 
