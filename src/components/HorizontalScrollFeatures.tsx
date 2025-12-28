@@ -89,6 +89,10 @@ const HorizontalScrollFeatures = () => {
   const maxProgress = useMemo(() => Math.max(0, features.length - 1), []);
 
   const lock = useCallback(() => {
+    // FIX 1: Snap to top immediately to remove the vertical gap
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: "auto", block: "start" });
+    }
     document.documentElement.style.scrollBehavior = "auto";
     document.body.style.overflowY = "hidden";
     setLocked(true);
@@ -107,7 +111,7 @@ const HorizontalScrollFeatures = () => {
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-        // Increased threshold to ensure we don't lock until fully visible
+        // Trigger slightly earlier (0.95) but allow the lock() function to snap it to 1.0
         if (entry.intersectionRatio >= 0.95) {
           lock();
         } else {
@@ -126,8 +130,7 @@ const HorizontalScrollFeatures = () => {
       if (!locked) return;
 
       const delta = e.deltaY;
-      // Adjusted sensitivity for smoother control
-      const next = clamp(progress + delta * 0.002, 0, maxProgress);
+      const next = clamp(progress + delta * 0.0025, 0, maxProgress);
 
       if (next !== progress) {
         e.preventDefault();
@@ -141,7 +144,7 @@ const HorizontalScrollFeatures = () => {
       if (leavingDown || leavingUp) {
         unlock();
         requestAnimationFrame(() => {
-          // Smaller push to avoid "extra space" gap
+          // Adjusted scroll push to be smoother
           window.scrollBy({ top: leavingDown ? 1 : -1, left: 0, behavior: "auto" });
         });
       }
@@ -157,7 +160,7 @@ const HorizontalScrollFeatures = () => {
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
       e.preventDefault();
       const dir = e.key === "ArrowRight" ? 1 : -1;
-      const next = clamp(progress + dir * 0.5, 0, maxProgress);
+      const next = clamp(progress + dir * 0.25, 0, maxProgress);
       setProgress(next);
       setActiveIndex(Math.round(next));
     };
@@ -166,31 +169,22 @@ const HorizontalScrollFeatures = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [locked, progress, maxProgress]);
 
-  // --- THE FIX ---
-  // Before: -progress * 100 (Moves 100% of TOTAL width per step) -> WAY too fast
-  // Now: -(progress / features.length) * 100 (Moves 100% of VIEWPORT width per step) -> Perfect sync
-  const translateX = -(progress / features.length) * 100;
+  // FIX 2: Correct math to sync progress bar with slides
+  // We move the track by a percentage relative to the track's total width.
+  // Since the track is (features.length * 100)%, we need to divide by length.
+  const translateX = -(progress * 100) / features.length;
 
   const progressPercent = (progress / maxProgress) * 100;
 
   return (
-    <section
-      id="features"
-      ref={containerRef as any}
-      className="relative h-screen overflow-hidden" // Removed -mb-px to fix gap
-      aria-label="Travexa features"
-    >
+    <section id="features" ref={containerRef as any} className="relative h-screen -mb-px" aria-label="Travexa features">
       {/* Top Progress Bar + Counter */}
       <div
-        className="fixed top-24 left-0 right-0 z-50 px-4 transition-all duration-500"
-        style={{
-          opacity: locked ? 1 : 0,
-          pointerEvents: locked ? "auto" : "none",
-          transform: locked ? "translateY(0)" : "translateY(-20px)",
-        }}
+        className="fixed top-20 left-0 right-0 z-50 px-4 transition-opacity duration-300"
+        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
       >
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 bg-background/80 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg border border-border/50">
+          <div className="flex items-center gap-4 bg-card/80 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg border">
             {/* Slide Counter */}
             <div className="flex items-center gap-2 text-sm font-medium min-w-[60px]">
               <span className="text-foreground">{activeIndex + 1}</span>
@@ -225,7 +219,7 @@ const HorizontalScrollFeatures = () => {
         className="fixed left-8 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col gap-4 transition-opacity duration-500"
         style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
       >
-        <div className="bg-card/80 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-border/50">
+        <div className="bg-card/80 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border">
           {features.map((feature, idx) => (
             <button
               key={idx}
@@ -262,6 +256,28 @@ const HorizontalScrollFeatures = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Mobile Progress Dots */}
+      <div
+        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex lg:hidden gap-2 p-2 bg-card/80 backdrop-blur-xl rounded-full shadow-xl border transition-opacity duration-500"
+        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
+      >
+        {features.map((feature, idx) => (
+          <button
+            key={idx}
+            onClick={() => {
+              setProgress(idx);
+              setActiveIndex(idx);
+            }}
+            className={`
+              w-3 h-3 rounded-full transition-all
+              ${prefersReducedMotion ? "" : "duration-300"}
+              ${activeIndex === idx ? `bg-gradient-to-r ${feature.gradient} scale-125` : "bg-muted hover:bg-muted-foreground/50"}
+            `}
+            aria-label={`Go to ${feature.title}`}
+          />
+        ))}
       </div>
 
       {/* Track */}
@@ -302,7 +318,6 @@ const HorizontalScrollFeatures = () => {
                     idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
                   } items-center gap-12 lg:gap-20`}
                 >
-                  {/* Card Section */}
                   <div
                     className="flex-1 flex justify-center"
                     style={{
@@ -317,7 +332,7 @@ const HorizontalScrollFeatures = () => {
                         />
                       )}
 
-                      <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 md:p-12 shadow-2xl">
+                      <div className="relative bg-card/80 backdrop-blur-xl border rounded-3xl p-8 md:p-12 shadow-2xl">
                         <div
                           className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center shadow-xl mb-6`}
                         >
@@ -337,19 +352,21 @@ const HorizontalScrollFeatures = () => {
                           ))}
                         </div>
 
-                        <div
-                          className="absolute -top-6 -right-6 text-5xl md:text-6xl transition-transform duration-1000"
-                          style={{
-                            animation: !prefersReducedMotion ? "float 4s ease-in-out infinite" : "none",
-                          }}
-                        >
-                          {feature.emoji}
-                        </div>
+                        {!prefersReducedMotion && (
+                          <div
+                            className="absolute -top-6 -right-6 text-5xl md:text-6xl"
+                            style={{ animation: "float 4s ease-in-out infinite" }}
+                          >
+                            {feature.emoji}
+                          </div>
+                        )}
+                        {prefersReducedMotion && (
+                          <div className="absolute -top-6 -right-6 text-5xl md:text-6xl">{feature.emoji}</div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Text Section */}
                   <div
                     className="flex-1 text-center lg:text-left"
                     style={{
