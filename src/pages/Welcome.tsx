@@ -6,16 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import FloatingParticles from "@/components/FloatingParticles";
+// Ensure this component exists in src/components/HorizontalScrollFeatures.tsx
 import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Plane, Sparkles, Globe, ChevronDown } from "lucide-react";
+import { Plane, Sparkles, Globe, ChevronDown, Ticket, Shield, Users, Zap } from "lucide-react";
+
+// Lazy load the heavy 3D globe
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
-// Ensure this array passes the actual Lucide components, not just names
-const features = [
-  { icon: Sparkles, title: "AI-Powered Planning", description: "...", emoji: "🤖" },
-  { icon: Ticket, title: "Unified Booking", description: "...", emoji: "🎫" },
-  // ... etc
-];
+
+// Helper component for fade-in animations on scroll
 const AnimatedSection = ({
   children,
   className = "",
@@ -25,9 +24,7 @@ const AnimatedSection = ({
   className?: string;
   delay?: number;
 }) => {
-  const { ref, isVisible } = useScrollAnimation({
-    threshold: 0.2,
-  });
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
   return (
     <div
       ref={ref}
@@ -42,46 +39,88 @@ const AnimatedSection = ({
     </div>
   );
 };
+
 const Welcome = () => {
   const navigate = useNavigate();
+
+  // 1. Authentication Check
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/");
-      }
+      if (session) navigate("/");
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate("/");
-      }
+      if (session) navigate("/");
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
-  const scrollToFeatures = () => {
-    document.getElementById("features")?.scrollIntoView({
-      behavior: "smooth",
-    });
-  };
-  return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* Floating Particles Background */}
-      <FloatingParticles />
 
-      {/* Animated Background Gradients */}
+  // 2. Smooth Scroll Handler
+  const scrollToFeatures = () => {
+    // Scrolls to the start of the horizontal section
+    const element = document.getElementById("features-start");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // 3. Features Data (Passed to the horizontal scroll component)
+  const features = [
+    {
+      icon: Sparkles,
+      title: "AI-Powered Planning",
+      description:
+        "Get personalized itineraries crafted by advanced AI based on your preferences, budget, and travel style.",
+      emoji: "🤖",
+    },
+    {
+      icon: Ticket,
+      title: "Unified Booking",
+      description: "Book flights, trains, buses, hotels, and cabs all in one place with the best prices guaranteed.",
+      emoji: "🎫",
+    },
+    {
+      icon: Shield,
+      title: "Best Price Guarantee",
+      description: "Our algorithms scan hundreds of options to find you unbeatable deals and exclusive discounts.",
+      emoji: "💰",
+    },
+    {
+      icon: Users,
+      title: "Social Travel Network",
+      description: "Connect with fellow travelers, share experiences, and find travel buddies for your next adventure.",
+      emoji: "👥",
+    },
+    {
+      icon: Globe,
+      title: "All-in-One Dashboard",
+      description: "Manage bookings, itineraries, and documents in one intuitive dashboard with offline access.",
+      emoji: "📱",
+    },
+    {
+      icon: Zap,
+      title: "Lightning Fast Search",
+      description: "Get instant results from thousands of routes and operators in seconds.",
+      emoji: "⚡",
+    },
+  ];
+
+  return (
+    // CRITICAL: overflow-x-hidden allows horizontal scroll component to work without breaking the page layout
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* --- Background Effects --- */}
+      <FloatingParticles />
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
         <div
           className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] animate-pulse"
-          style={{
-            animationDelay: "1s",
-          }}
+          style={{ animationDelay: "1s" }}
         />
       </div>
 
-      {/* Header */}
+      {/* --- Header --- */}
       <header className="relative z-50 bg-background/60 backdrop-blur-xl border-b border-border/50 sticky top-0">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
           <Link to="/welcome" className="flex items-center gap-2 group">
@@ -104,7 +143,7 @@ const Welcome = () => {
       </header>
 
       <main className="relative z-10">
-        {/* Hero Section with Globe */}
+        {/* --- Hero Section --- */}
         <section className="min-h-[90vh] flex items-center justify-center relative">
           <div className="container mx-auto px-6 py-16 max-w-6xl">
             <div className="flex flex-col lg:flex-row items-center gap-12">
@@ -150,28 +189,18 @@ const Welcome = () => {
               {/* 3D Globe */}
               <AnimatedSection delay={300} className="flex-1 flex justify-center">
                 <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
-                  {/* Globe Glow Effects */}
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-purple-500/40 blur-3xl animate-pulse" />
-
-                  {/* 3D Globe Container */}
                   <div className="relative w-full h-full rounded-full overflow-hidden">
                     <Suspense
                       fallback={
                         <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 animate-pulse flex items-center justify-center">
-                          <Globe
-                            className="h-20 w-20 text-white/50 animate-spin"
-                            style={{
-                              animationDuration: "3s",
-                            }}
-                          />
+                          <Globe className="h-20 w-20 text-white/50 animate-spin" style={{ animationDuration: "3s" }} />
                         </div>
                       }
                     >
                       <RealisticGlobe />
                     </Suspense>
                   </div>
-
-                  {/* Travel the World Text */}
                   <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <p className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500">
                       Travel the World with TraveXa
@@ -181,20 +210,18 @@ const Welcome = () => {
               </AnimatedSection>
             </div>
           </div>
-
-          {/* Scroll Indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-            <ChevronDown className="h-8 w-8 text-muted-foreground" />
-          </div>
         </section>
 
-        {/* Horizontal Scroll Features */}
-        <HorizontalScrollFeatures />
+        {/* --- Horizontal Scroll Features Section --- */}
+        {/* We use an ID here to allow the "Explore Features" button to scroll to this exact spot */}
+        <div id="features-start">
+          <HorizontalScrollFeatures features={features} />
+        </div>
 
-        {/* Featured Trips - No gap after features */}
+        {/* --- Featured Trips Section --- */}
         <FeaturedTrips />
 
-        {/* Feedback Section */}
+        {/* --- Feedback Section --- */}
         <AnimatedSection className="container mx-auto px-6 py-20 max-w-4xl">
           <Card className="relative overflow-hidden border-2 border-accent/20 bg-gradient-to-br from-accent/5 via-background to-primary/5 backdrop-blur-xl shadow-2xl">
             <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -214,9 +241,7 @@ const Welcome = () => {
             <CardContent className="text-center space-y-6 relative z-10">
               <p className="text-xl font-medium text-foreground">Would you use Travexa if it were fully functional?</p>
               <p className="text-muted-foreground max-w-lg mx-auto">
-                Your feedback helps us understand what travelers need most. We're working hard to bring you features
-                like social connections with fellow travelers, travel companion matching, and seamless booking
-                experiences.
+                Your feedback helps us understand what travelers need most.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <Button size="lg" className="px-8 shadow-xl shadow-primary/20 hover:shadow-primary/40" asChild>
@@ -231,6 +256,7 @@ const Welcome = () => {
         </AnimatedSection>
       </main>
 
+      {/* --- Footer --- */}
       <footer className="relative z-10 border-t border-border/50 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-8 max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
@@ -250,26 +276,16 @@ const Welcome = () => {
         </div>
       </footer>
 
-      {/* Float Animation Keyframes */}
+      {/* --- Global Styles for Animations --- */}
       <style>{`
         @keyframes float {
-          0%, 100% {
-            transform: translateY(0px) rotate(0deg);
-          }
-          50% {
-            transform: translateY(-20px) rotate(5deg);
-          }
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(5deg); }
         }
-        
         @keyframes gradient {
-          0%, 100% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
         }
-        
         .animate-gradient {
           background-size: 200% 200%;
           animation: gradient 4s ease infinite;
@@ -278,4 +294,5 @@ const Welcome = () => {
     </div>
   );
 };
+
 export default Welcome;
