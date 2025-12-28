@@ -1,88 +1,84 @@
-import React from 'react';
-import { ItineraryStep } from '@/types/tripPlanner';
+import React from "react";
+import { ItineraryStep } from "@/types/tripPlanner";
 
 interface ItineraryMapProps {
   steps: ItineraryStep[];
 }
 
 const ItineraryMap: React.FC<ItineraryMapProps> = ({ steps }) => {
-  // Extract valid locations, filtering consecutive duplicates
+  // 1. Get Clean List of Stops
   const uniqueLocations = steps.reduce((acc, step) => {
+    if (!step.location) return acc;
     const lastLoc = acc.length > 0 ? acc[acc.length - 1] : null;
-    if (step.location && step.location !== lastLoc) {
+    // Prevent duplicate consecutive stops (e.g. Hotel -> Hotel)
+    if (step.location !== lastLoc) {
       acc.push(step.location);
     }
     return acc;
   }, [] as string[]);
 
-  if (uniqueLocations.length < 1) {
-    return null;
-  }
-
-  // User requested to exclude the current location (origin) to focus on the destination area.
-  // Logic:
-  // 1. Assume the first location is the Origin. Remove it.
-  // 2. If the last location is the same as the Origin (return trip), remove it too.
-  // This ensures the map stays zoomed in on the destination activities.
+  // 2. Filter Logic (Same as before)
+  // Remove the "Home/Origin" airport so the map focuses on the holiday destination
   let displayLocations: string[] = [];
   if (uniqueLocations.length > 1) {
     const startLocation = uniqueLocations[0];
-    // Remove the start location
     let trimmed = uniqueLocations.slice(1);
-    // Check if the trip returns to the start location at the very end
     if (trimmed.length > 0 && trimmed[trimmed.length - 1] === startLocation) {
       trimmed.pop();
     }
-    displayLocations = trimmed;
+    displayLocations = trimmed.length > 0 ? trimmed : uniqueLocations;
   } else {
-    // If only one location exists, we have to show it (even if it's the origin, though unlikely for a full trip plan)
     displayLocations = uniqueLocations;
   }
 
-  if (displayLocations.length === 0) {
-    // If filtering removed everything (e.g. Origin -> Origin), show nothing or fallback to destination if available?
-    // For now, return null to hide map rather than showing a map of "home".
-    return null;
-  }
+  if (displayLocations.length === 0) return null;
 
-  let src = "";
+  // 3. The "No-API" URL Construction
+  // We use the legacy 'maps?q=' format which is free and public.
+  const buildNoApiUrl = () => {
+    const baseUrl = "https://maps.google.com/maps";
 
-  if (displayLocations.length === 1) {
-    // Single location map (e.g. just the destination city or hotel)
-    src = `https://maps.google.com/maps?q=${encodeURIComponent(displayLocations[0])}&output=embed`;
-  } else {
-    // Route map showing movement within the destination
-    // e.g. Airport -> Hotel -> Restaurant -> Attraction
-    const origin = displayLocations[0];
-    const destination = displayLocations[displayLocations.length - 1];
-    // Intermediate stops (limit to avoid URL length issues)
-    // We take up to 8 intermediates to keep the URL safe for iframes
-    const intermediates = displayLocations.slice(1, -1).slice(0, 8);
-    let daddr = "";
-    if (intermediates.length > 0) {
-      daddr = intermediates.map(loc => encodeURIComponent(loc)).join('+to:');
-      daddr += `+to:${encodeURIComponent(destination)}`;
-    } else {
-      daddr = encodeURIComponent(destination);
+    // If we only have one place (e.g., just the Hotel)
+    if (displayLocations.length === 1) {
+      return `${baseUrl}?q=${encodeURIComponent(displayLocations[0])}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
     }
 
-    src = `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${daddr}&output=embed`;
-  }
+    // If we have a route (A -> B -> C)
+    // We construct a query like: "from:Ranchi to:Goa to:HotelXYZ"
+    // This tricks the Search Engine into showing a route without using the API.
+
+    // Limit to 10 stops to prevent URL length errors
+    const safeLocations = displayLocations.slice(0, 10);
+
+    const start = safeLocations[0];
+    const others = safeLocations.slice(1);
+
+    // Build string: "from:Start to:Loc1 to:Loc2 to:End"
+    let queryString = `from:${start}`;
+    others.forEach((loc) => {
+      queryString += `+to:${loc}`;
+    });
+
+    return `${baseUrl}?q=${encodeURIComponent(queryString)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+  };
 
   return (
-    <div className="w-full h-[400px] md:h-[450px] rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-muted relative group">
+    <div className="w-full h-[450px] rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-muted relative group">
       <iframe
         width="100%"
         height="100%"
         style={{ border: 0 }}
         loading="lazy"
         allowFullScreen
-        src={src}
+        referrerPolicy="no-referrer-when-downgrade"
+        src={buildNoApiUrl()}
         title="Trip Route Map"
-        className="grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
+        className="w-full h-full"
       ></iframe>
-      <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-xs font-bold px-3 py-1 rounded-full shadow-sm text-muted-foreground pointer-events-none">
-        Interactive Map
+
+      {/* Badge to show it's working */}
+      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md text-xs font-bold px-3 py-1 rounded-full shadow-sm text-gray-600 pointer-events-none border border-gray-200">
+        Route Preview
       </div>
     </div>
   );
