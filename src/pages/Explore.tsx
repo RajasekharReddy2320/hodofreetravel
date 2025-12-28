@@ -736,7 +736,7 @@ const Explore = () => {
       <DashboardNav />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Explore</h1>
+          <h1 className="text-3xl font-bold">Tramigos</h1>
           <CreatePostDialog onPostCreated={handlePostUpdate} />
         </div>
 
