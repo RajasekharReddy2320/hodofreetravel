@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -142,14 +142,17 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
+  // Sidebar & Auth
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
+
+  // Theme
   const [messageTheme, setMessageTheme] = useState("default");
   const [showThemePicker, setShowThemePicker] = useState(false);
 
-  // State
+  // Features State
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyTravelers, setNearbyTravelers] = useState<BuddySearchResult[]>([]);
@@ -160,12 +163,17 @@ const Explore = () => {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pendingReceived, setPendingReceived] = useState<Connection[]>([]);
   const [pendingSent, setPendingSent] = useState<Connection[]>([]);
+
+  // Messaging State
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement>(null); // For auto-scrolling chat
+
+  // Travel Buddies State
   const [travelGroups, setTravelGroups] = useState<TravelGroup[]>([]);
   const [userGroupMemberships, setUserGroupMemberships] = useState<Set<string>>(new Set());
   const [buddySearchQuery, setBuddySearchQuery] = useState("");
@@ -211,7 +219,6 @@ const Explore = () => {
   };
 
   // --- DATA LOADING & ACTIONS ---
-
   const loadTravelGroups = async () => {
     const { data, error } = await supabase
       .from("travel_groups")
@@ -452,6 +459,8 @@ const Explore = () => {
     setAllUsers(data || []);
   };
 
+  // --- MESSAGING SYSTEM ---
+
   const loadConversations = async () => {
     const {
       data: { user },
@@ -506,6 +515,17 @@ const Explore = () => {
     if (selectedUser) loadMessages();
   }, [selectedUser]);
 
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      // Need to target the viewport inside ScrollArea if possible, or just the div wrapper
+      const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages]);
+
   const sendMessage = async () => {
     if (!selectedUser || !currentUserId) return;
     const validation = messageSchema.safeParse({ content: messageText });
@@ -521,16 +541,16 @@ const Explore = () => {
       return;
     }
     setMessageText("");
-    loadMessages();
-    loadConversations();
   };
 
+  // --- PERMANENT DELETION LOGIC ---
   const unsendMessage = async (messageId: string) => {
     const { error } = await supabase.from("messages").delete().eq("id", messageId);
     if (error) {
       toast({ title: "Error", description: "Failed to delete message", variant: "destructive" });
       return;
     }
+    // Optimistic update
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     toast({ title: "Message Deleted" });
   };
@@ -555,25 +575,57 @@ const Explore = () => {
 
   const totalUnreadMessages = conversations.reduce((acc, curr) => acc + curr.unreadCount, 0);
 
+  // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
     if (!currentUserId) return;
+
+    // 1. Posts Subscription
     const postsChannel = supabase
       .channel("posts-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts())
       .subscribe();
+
+    // 2. Messages Subscription (Handles INSERT, UPDATE, DELETE)
+    // We listen to * to ensure we catch deletions and read-status updates
     const messagesChannel = supabase
-      .channel("messages")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `recipient_id=eq.${currentUserId}` },
-        (payload) => {
-          if (selectedUser && payload.new.sender_id === selectedUser.id) {
-            setMessages((prev) => [...prev, payload.new as Message]);
+      .channel("messages-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
+        // Handle New Message
+        if (payload.eventType === "INSERT") {
+          const newMsg = payload.new as Message;
+          // Add to current chat if open
+          if (
+            selectedUser &&
+            ((newMsg.sender_id === selectedUser.id && newMsg.recipient_id === currentUserId) ||
+              (newMsg.sender_id === currentUserId && newMsg.recipient_id === selectedUser.id))
+          ) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+            // If receiving, mark read immediately if window open
+            if (newMsg.recipient_id === currentUserId) {
+              supabase.from("messages").update({ read: true }).eq("id", newMsg.id);
+            }
           }
           loadConversations();
-        },
-      )
+        }
+
+        // Handle Deleted Message (Permanent Deletion)
+        if (payload.eventType === "DELETE") {
+          const deletedId = payload.old.id;
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+          loadConversations();
+        }
+
+        // Handle Updates (Read receipts)
+        if (payload.eventType === "UPDATE") {
+          const updatedMsg = payload.new as Message;
+          setMessages((prev) => prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)));
+        }
+      })
       .subscribe();
+
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(messagesChannel);
@@ -590,7 +642,7 @@ const Explore = () => {
 
   const tabs = [
     { id: "feed" as const, label: "Tramigos", icon: Rss },
-    { id: "messages" as const, label: "Messages", icon: MessageSquare },
+    { id: "messages" as const, label: "Messages", icon: MessageSquare, badge: totalUnreadMessages },
     { id: "travel-groups" as const, label: "Travel Groups", icon: Plane },
     { id: "find-buddies" as const, label: "Find Tramigos", icon: Search },
     { id: "nearby" as const, label: "Nearby", icon: MapPin },
@@ -599,7 +651,7 @@ const Explore = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* 1. Header (Normal Scrolling) */}
       <DashboardNav />
 
@@ -776,10 +828,10 @@ const Explore = () => {
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" onClick={() => acceptConnection(req.id)}>
-                                Accept
+                                <Check className="h-4 w-4 mr-1" /> Accept
                               </Button>
                               <Button size="sm" variant="outline" onClick={() => rejectConnection(req.id)}>
-                                Decline
+                                <X className="h-4 w-4 mr-1" /> Decline
                               </Button>
                             </div>
                           </CardContent>
@@ -791,9 +843,10 @@ const Explore = () => {
               </div>
             )}
 
-            {/* --- Messages Tab (Fixed) --- */}
+            {/* --- Messages Tab (Updated with Permanent Delete) --- */}
             {activeTab === "messages" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)] min-h-[500px]">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-140px)] min-h-[500px]">
+                {/* Conversations List */}
                 <Card className="md:col-span-1 border-r-0 rounded-r-none">
                   <CardHeader className="pb-2 px-4 pt-4">
                     <CardTitle className="text-lg flex items-center justify-between">Chats</CardTitle>
@@ -808,7 +861,7 @@ const Explore = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <ScrollArea className="h-[calc(100vh-320px)]">
+                    <ScrollArea className="h-[calc(100vh-260px)]">
                       {(searchQuery ? filteredUsers : conversations.map((c) => c.user)).map((user) => {
                         const convo = conversations.find((c) => c.user.id === user.id);
                         return (
@@ -851,6 +904,7 @@ const Explore = () => {
                   </CardContent>
                 </Card>
 
+                {/* Chat Window */}
                 <Card className="md:col-span-2 flex flex-col border-l-0 rounded-l-none h-full">
                   {selectedUser ? (
                     <>
@@ -888,7 +942,9 @@ const Explore = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex-1 overflow-hidden relative">
+
+                      {/* Messages Area */}
+                      <div className="flex-1 overflow-hidden relative" ref={scrollAreaRef}>
                         <ScrollArea className="h-full px-4 py-4">
                           {messages.map((msg, index) => {
                             const messageDate = new Date(msg.created_at);
@@ -914,6 +970,7 @@ const Explore = () => {
                                       className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
                                     >
                                       <span>{format(messageDate, "h:mm a")}</span>
+                                      {/* Read Receipts */}
                                       {isMe && (
                                         <span>
                                           {msg.read ? (
@@ -924,6 +981,7 @@ const Explore = () => {
                                         </span>
                                       )}
                                     </div>
+                                    {/* Unsend Button */}
                                     {isMe && (
                                       <div className="absolute top-0 -left-8 opacity-0 group-hover:opacity-100 transition-opacity p-1">
                                         <Button
@@ -943,6 +1001,7 @@ const Explore = () => {
                           })}
                         </ScrollArea>
                       </div>
+
                       <div className="p-3 bg-background border-t">
                         <div className="flex gap-2 items-end">
                           <Input
@@ -979,42 +1038,7 @@ const Explore = () => {
               </div>
             )}
 
-            {/* --- Travel Groups Tab (Restored to original card view) --- */}
-            {activeTab === "travel-groups" && (
-              <>
-                <div className="mb-6 flex justify-between items-center">
-                  <div>
-                    <h2 className="text-2xl font-bold">Travel Groups</h2>
-                    <p className="text-muted-foreground">Find travel companions for your next adventure</p>
-                  </div>
-                  <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
-                </div>
-                {travelGroups.length === 0 ? (
-                  <Card>
-                    <CardContent className="pt-12 pb-12">
-                      <div className="text-center text-muted-foreground">
-                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                        <p>No travel groups yet.</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {travelGroups.map((group) => (
-                      <TravelGroupCard
-                        key={group.id}
-                        group={group}
-                        currentUserId={currentUserId!}
-                        isMember={userGroupMemberships.has(group.id)}
-                        onUpdate={handleGroupUpdate}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* --- Other Tabs --- */}
+            {/* --- Saved Tab --- */}
             {activeTab === "saved" && (
               <div className="space-y-6">
                 {posts.filter((p) => userSaves.has(p.id)).length === 0 ? (
@@ -1039,6 +1063,7 @@ const Explore = () => {
               </div>
             )}
 
+            {/* --- Find Buddies Tab --- */}
             {activeTab === "find-buddies" && (
               <Card>
                 <CardHeader>
@@ -1113,6 +1138,7 @@ const Explore = () => {
               </Card>
             )}
 
+            {/* --- Nearby Tab --- */}
             {activeTab === "nearby" && (
               <Card>
                 <CardHeader>
@@ -1147,6 +1173,7 @@ const Explore = () => {
               </Card>
             )}
 
+            {/* --- Travel With Me Tab --- */}
             {activeTab === "travel-with-me" && (
               <Card>
                 <CardHeader>
@@ -1160,6 +1187,41 @@ const Explore = () => {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* --- Travel Groups Tab (Restored) --- */}
+            {activeTab === "travel-groups" && (
+              <>
+                <div className="mb-6 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold">Travel Groups</h2>
+                    <p className="text-muted-foreground">Find travel companions for your next adventure</p>
+                  </div>
+                  <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
+                </div>
+                {travelGroups.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-12 pb-12">
+                      <div className="text-center text-muted-foreground">
+                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                        <p>No travel groups yet.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {travelGroups.map((group) => (
+                      <TravelGroupCard
+                        key={group.id}
+                        group={group}
+                        currentUserId={currentUserId!}
+                        isMember={userGroupMemberships.has(group.id)}
+                        onUpdate={handleGroupUpdate}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
