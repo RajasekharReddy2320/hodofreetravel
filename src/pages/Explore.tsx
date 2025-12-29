@@ -170,9 +170,7 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  // Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
@@ -212,7 +210,6 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
-  // Sync tab from URL
   useEffect(() => {
     if (tab && VALID_TABS.includes(tab as TabType)) {
       setActiveTab(tab as TabType);
@@ -288,12 +285,9 @@ const Explore = () => {
 
   const handleGroupUpdate = () => {
     loadTravelGroups();
-    if (currentUserId) {
-      loadUserGroupMemberships(currentUserId);
-    }
+    if (currentUserId) loadUserGroupMemberships(currentUserId);
   };
 
-  // Search Logic
   const performBuddySearch = async () => {
     if (!currentUserId) return;
     setBuddySearchLoading(true);
@@ -329,11 +323,9 @@ const Explore = () => {
   const sendBuddyConnectionRequest = async (targetUserId: string) => {
     if (!currentUserId) return;
     try {
-      const { error } = await supabase.from("user_connections").insert({
-        requester_id: currentUserId,
-        addressee_id: targetUserId,
-        status: "pending",
-      });
+      const { error } = await supabase
+        .from("user_connections")
+        .insert({ requester_id: currentUserId, addressee_id: targetUserId, status: "pending" });
       if (error) throw error;
       toast({ title: "Request Sent", description: "Connection request sent successfully" });
       performBuddySearch();
@@ -342,7 +334,6 @@ const Explore = () => {
     }
   };
 
-  // Geolocation
   const requestLocation = async () => {
     setLocationError(null);
     setNearbyLoading(true);
@@ -395,18 +386,11 @@ const Explore = () => {
     }
   };
 
-  // --- POSTS FUNCTIONS ---
   const loadPosts = async () => {
     const { data, error } = await supabase
       .from("posts")
-      .select(
-        `
-        *,
-        profiles:user_id (full_name, avatar_url)
-      `,
-      )
+      .select(`*, profiles:user_id (full_name, avatar_url)`)
       .order("created_at", { ascending: false });
-
     if (error) {
       toast({ title: "Error loading posts", description: error.message, variant: "destructive" });
       return;
@@ -430,7 +414,6 @@ const Explore = () => {
     }
   };
 
-  // Connections functions
   const loadConnections = async (userId: string) => {
     const { data: accepted } = await supabase
       .from("user_connections")
@@ -441,12 +424,13 @@ const Explore = () => {
       const userIds = [...new Set(accepted.flatMap((c) => [c.requester_id, c.addressee_id]))];
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const connectionsWithProfiles = accepted.map((conn) => ({
-        ...conn,
-        requester: profileMap.get(conn.requester_id),
-        addressee: profileMap.get(conn.addressee_id),
-      }));
-      setConnections(connectionsWithProfiles as Connection[]);
+      setConnections(
+        accepted.map((conn) => ({
+          ...conn,
+          requester: profileMap.get(conn.requester_id),
+          addressee: profileMap.get(conn.addressee_id),
+        })) as Connection[],
+      );
     }
     const { data: received } = await supabase
       .from("user_connections")
@@ -457,8 +441,9 @@ const Explore = () => {
       const userIds = received.map((r) => r.requester_id);
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const requestsWithProfiles = received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) }));
-      setPendingReceived(requestsWithProfiles as Connection[]);
+      setPendingReceived(
+        received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) })) as Connection[],
+      );
     }
     const { data: sent } = await supabase
       .from("user_connections")
@@ -469,8 +454,7 @@ const Explore = () => {
       const userIds = sent.map((s) => s.addressee_id);
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const requestsWithProfiles = sent.map((req) => ({ ...req, addressee: profileMap.get(req.addressee_id) }));
-      setPendingSent(requestsWithProfiles as Connection[]);
+      setPendingSent(sent.map((req) => ({ ...req, addressee: profileMap.get(req.addressee_id) })) as Connection[]);
     }
   };
 
@@ -480,7 +464,7 @@ const Explore = () => {
       toast({ title: "Error", variant: "destructive" });
       return;
     }
-    toast({ title: "Connection Accepted", description: "You are now connected!" });
+    toast({ title: "Connection Accepted" });
     if (currentUserId) loadConnections(currentUserId);
   };
 
@@ -504,7 +488,6 @@ const Explore = () => {
     if (currentUserId) loadConnections(currentUserId);
   };
 
-  // Messages functions
   const loadAllUsers = async () => {
     const {
       data: { user },
@@ -599,7 +582,6 @@ const Explore = () => {
   const filteredUsers = allUsers.filter((user) => user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
   const currentTheme = MESSAGE_THEMES.find((t) => t.id === messageTheme) || MESSAGE_THEMES[0];
 
-  // Realtime Logic
   useEffect(() => {
     if (!currentUserId) return;
     const postsChannel = supabase
@@ -674,23 +656,17 @@ const Explore = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* 1. Header (Sticky Top) */}
-      <div className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <DashboardNav />
-      </div>
+      {/* 1. Header (Normal flow, so it scrolls away) */}
+      <DashboardNav />
 
-      {/* 2. Content Container */}
+      {/* 2. Content Container (Flex container for sidebar + main) */}
       <div className="flex flex-1 items-start">
-        {/* SIDEBAR: Fixed Below Header
-            top-16 ensures it starts right after the header. 
-            h-[calc(100vh-4rem)] makes it fill the rest of the height without going offscreen.
-        */}
+        {/* SIDEBAR: Sticky positioning makes it stick to the top when header scrolls out */}
         <aside
-          className={`fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] overflow-y-auto border-r bg-background/95 backdrop-blur-sm transition-all duration-200 ease-in-out
+          className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
-          {/* Toggle Button */}
           <div className={`flex items-center h-16 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -744,15 +720,8 @@ const Explore = () => {
           </div>
         </aside>
 
-        {/* MAIN CONTENT AREA: 
-            Adjusts left margin based on sidebar state.
-            No top padding needed as header is sticky and takes up layout space.
-        */}
-        <main
-          className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6
-          ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
-        `}
-        >
+        {/* MAIN CONTENT AREA: Expands to fill remaining width */}
+        <main className="flex-1 min-w-0 px-4 py-6">
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
