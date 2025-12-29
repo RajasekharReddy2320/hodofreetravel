@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardNav from "@/components/DashboardNav";
-import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { CreostDialog } from "@/components/CreatePostDialog";
 import { CreateTravelGroupDialog } from "@/components/CreateTravelGroupDialog";
 import { TravelGroupCard } from "@/components/TravelGroupCard";
 import { PostCard } from "@/components/PostCard";
