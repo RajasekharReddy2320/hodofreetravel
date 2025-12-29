@@ -1,4 +1,3 @@
-import { Link, useLocation } from "react-router-dom";
 import { 
   Grid3X3, 
   Globe, 
@@ -6,12 +5,20 @@ import {
   Ticket, 
   Bookmark, 
   Heart, 
-  Settings, 
   ChevronLeft,
-  Menu
+  Menu,
+  Wallet,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface ProfileSidebarProps {
   isOpen: boolean;
@@ -28,7 +35,6 @@ const ProfileSidebar = ({
   onTabChange,
   isOwnProfile 
 }: ProfileSidebarProps) => {
-  const location = useLocation();
 
   const tabs = [
     { id: "posts", label: "Posts", icon: Grid3X3 },
@@ -38,51 +44,103 @@ const ProfileSidebar = ({
     ...(isOwnProfile ? [
       { id: "saved", label: "Saved", icon: Bookmark },
       { id: "liked", label: "Liked", icon: Heart },
+      { id: "wallet", label: "Wallet", icon: Wallet },
+      { id: "settings", label: "Settings", icon: Settings },
     ] : []),
   ];
 
+  const handleTabClick = (tabId: string) => {
+    onTabChange(tabId);
+    onToggle(); // Close sidebar on mobile after selection
+  };
+
+  const SidebarContent = () => (
+    <nav className="px-2 py-4 space-y-1">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = activeTab === tab.id;
+        
+        return (
+          <button
+            key={tab.id}
+            onClick={() => handleTabClick(tab.id)}
+            className={cn(
+              "flex items-center w-full rounded-lg transition-all duration-200 px-4 py-3 gap-3",
+              isActive
+                ? "bg-primary/10 text-primary font-medium"
+                : "hover:bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Icon className="h-5 w-5 shrink-0" />
+            <span>{tab.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+
   return (
-    <aside
-      className={cn(
-        "fixed top-0 left-0 h-screen bg-background/95 backdrop-blur-sm border-r z-50 transition-all duration-300 ease-in-out",
-        isOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full md:w-16 md:translate-x-0"
-      )}
-    >
-      <div className={cn(
-        "flex items-center h-16 px-4",
-        isOpen ? "justify-between" : "justify-center"
-      )}>
-        {isOpen && <span className="font-semibold text-lg">Profile</span>}
-        <Button variant="ghost" size="icon" onClick={onToggle}>
-          {isOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+    <>
+      {/* Mobile Sheet */}
+      <div className="md:hidden">
+        <Sheet open={isOpen} onOpenChange={onToggle}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="fixed top-20 left-4 z-40 bg-background/80 backdrop-blur-sm shadow-md">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 p-0">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle>Profile Menu</SheetTitle>
+            </SheetHeader>
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
       </div>
 
-      <nav className="px-2 space-y-1">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                "flex items-center w-full rounded-lg transition-all duration-200",
-                isOpen ? "px-4 py-3 gap-3" : "p-3 justify-center",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              )}
-              title={!isOpen ? tab.label : undefined}
-            >
-              <Icon className={cn("shrink-0", isOpen ? "h-5 w-5" : "h-6 w-6")} />
-              {isOpen && <span className="font-medium">{tab.label}</span>}
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
+      {/* Desktop Sidebar */}
+      <aside
+        className={cn(
+          "hidden md:block fixed top-16 left-0 h-[calc(100vh-4rem)] bg-background/95 backdrop-blur-sm border-r z-40 transition-all duration-300 ease-in-out",
+          isOpen ? "w-64" : "w-16"
+        )}
+      >
+        <div className={cn(
+          "flex items-center h-14 px-4",
+          isOpen ? "justify-between" : "justify-center"
+        )}>
+          {isOpen && <span className="font-semibold text-lg">Profile</span>}
+          <Button variant="ghost" size="icon" onClick={onToggle}>
+            {isOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
+
+        <nav className="px-2 space-y-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={cn(
+                  "flex items-center w-full rounded-lg transition-all duration-200",
+                  isOpen ? "px-4 py-3 gap-3" : "p-3 justify-center",
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                )}
+                title={!isOpen ? tab.label : undefined}
+              >
+                <Icon className={cn("shrink-0", isOpen ? "h-5 w-5" : "h-6 w-6")} />
+                {isOpen && <span>{tab.label}</span>}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 };
 
