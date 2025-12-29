@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -585,7 +585,7 @@ const Profile = () => {
         {/* Content Tabs */}
         <div className="px-4 md:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-5 bg-muted/50 rounded-xl p-1">
+            <TabsList className="w-full grid grid-cols-6 bg-muted/50 rounded-xl p-1">
               <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <Grid3X3 className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Posts</span>
@@ -602,6 +602,10 @@ const Profile = () => {
                 <Ticket className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Tickets</span>
               </TabsTrigger>
+              {isOwnProfile && <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <History className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">History</span>
+                </TabsTrigger>}
               {isOwnProfile && <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Bookmark className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">Saved</span>
@@ -738,6 +742,71 @@ const Profile = () => {
                   </Tabs>;
             })()}
             </TabsContent>
+
+            {/* Booking History Tab */}
+            {isOwnProfile && <TabsContent value="history" className="mt-6 space-y-4">
+              {userBookings.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <History className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No booking history</h3>
+                  <p className="text-muted-foreground text-sm mb-4">Your travel history will appear here</p>
+                  <Button onClick={() => navigate("/book-transport")}>Book a Trip</Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userBookings.map(booking => (
+                    <Card 
+                      key={booking.id} 
+                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => navigate('/ticket-details', { state: { booking } })}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${
+                              booking.status === "cancelled" 
+                                ? "bg-destructive/10" 
+                                : new Date(booking.departure_date) < new Date() 
+                                  ? "bg-green-500/10" 
+                                  : "bg-primary/10"
+                            }`}>
+                              {booking.status === "cancelled" 
+                                ? <XCircle className="h-5 w-5 text-destructive" />
+                                : new Date(booking.departure_date) < new Date()
+                                  ? <CheckCircle className="h-5 w-5 text-green-600" />
+                                  : <Clock className="h-5 w-5 text-primary" />
+                              }
+                            </div>
+                            <div>
+                              <h4 className="font-semibold">{booking.from_location} → {booking.to_location}</h4>
+                              <p className="text-sm text-muted-foreground capitalize">{booking.booking_type} • {booking.service_name}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{booking.departure_date} • {booking.departure_time}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={
+                              booking.status === "cancelled" 
+                                ? "destructive" 
+                                : new Date(booking.departure_date) < new Date() 
+                                  ? "secondary" 
+                                  : "default"
+                            }>
+                              {booking.status === "cancelled" 
+                                ? "Cancelled" 
+                                : new Date(booking.departure_date) < new Date() 
+                                  ? "Completed" 
+                                  : "Upcoming"}
+                            </Badge>
+                            <p className="text-sm font-semibold text-primary mt-1">₹{parseFloat(booking.price_inr).toLocaleString("en-IN")}</p>
+                            <p className="text-xs text-muted-foreground">Ref: {booking.booking_reference}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>}
 
             {/* Saved Tab */}
             {isOwnProfile && <TabsContent value="saved" className="mt-6 space-y-6">

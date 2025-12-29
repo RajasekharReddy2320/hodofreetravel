@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   Menu,
   Wallet,
-  Settings
+  Settings,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ const ProfileSidebar = ({
     { id: "groups", label: "Groups", icon: Users },
     { id: "bookings", label: "Tickets", icon: Ticket },
     ...(isOwnProfile ? [
+      { id: "history", label: "Booking History", icon: History },
       { id: "saved", label: "Saved", icon: Bookmark },
       { id: "liked", label: "Liked", icon: Heart },
       { id: "wallet", label: "Wallet", icon: Wallet },
