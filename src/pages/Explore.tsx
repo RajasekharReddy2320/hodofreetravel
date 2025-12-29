@@ -530,7 +530,7 @@ const Explore = () => {
       return;
     }
 
-    // Optimistic Update can be done here if needed, but for safety we await DB
+    // 1. Send to DB (await result to get real ID/timestamp)
     const { data, error } = await supabase
       .from("messages")
       .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content })
@@ -542,20 +542,34 @@ const Explore = () => {
       return;
     }
 
-    // Update local state immediately so user sees it without refresh
-    setMessages((prev) => [...prev, data as Message]);
+    // 2. Add to state immediately (Fixes "not visible until refresh")
+    setMessages((prev) => {
+      // Avoid duplicate if realtime already caught it
+      if (prev.some((m) => m.id === data.id)) return prev;
+      return [...prev, data as Message];
+    });
+
     setMessageText("");
+    loadConversations();
   };
 
+  // --- PERMANENT DELETION LOGIC ---
   const unsendMessage = async (messageId: string) => {
-    const { error } = await supabase.from("messages").delete().eq("id", messageId);
-    if (error) {
-      toast({ title: "Error", description: "Failed to delete message", variant: "destructive" });
-      return;
-    }
-    // Update local state immediately
+    // 1. Optimistic Update (Remove from UI instantly)
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
-    toast({ title: "Message Deleted" });
+
+    // 2. Perform DB delete
+    const { error } = await supabase.from("messages").delete().eq("id", messageId);
+
+    if (error) {
+      console.error("Delete failed:", error); // Debugging
+      toast({ title: "Error", description: "Failed to delete message. Check RLS policies.", variant: "destructive" });
+      // Revert optimization (optional, or just reload)
+      loadMessages();
+    } else {
+      toast({ title: "Message Deleted" });
+      loadConversations();
+    }
   };
 
   const getInitials = (name: string | null) => {
@@ -601,7 +615,7 @@ const Explore = () => {
         // Handle New Message (Only incoming needs adding, outgoing added by function)
         if (payload.eventType === "INSERT") {
           const newMsg = payload.new as Message;
-          // Only add if it's not already in state (dedup)
+          // Add to current chat if open
           if (
             selectedUser &&
             ((newMsg.sender_id === selectedUser.id && newMsg.recipient_id === currentUserId) ||
@@ -816,6 +830,7 @@ const Explore = () => {
                     })}
                   </div>
                 )}
+                {/* Pending Requests logic remains same but condensed here for brevity... */}
                 {pendingReceived.length > 0 && (
                   <div className="mt-8">
                     <h3 className="font-semibold mb-4">Pending Requests</h3>
