@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
-import { useAutoHideNav } from "@/hooks/useAutoHideNav";
+
 
 const DashboardNav = () => {
   const location = useLocation();
@@ -13,7 +13,7 @@ const DashboardNav = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isNavExpanded, setIsNavExpanded] = useState(true);
   const { itemCount } = useCart();
-  const { isNavVisible } = useAutoHideNav();
+  
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -26,9 +26,7 @@ const DashboardNav = () => {
 
   return (
     <nav 
-      className={`sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-transform duration-300 ${
-        isNavVisible ? 'translate-y-0' : '-translate-y-full'
-      }`}
+      className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
       <div className="container flex h-16 items-center gap-2 px-4">
         {/* Logo */}

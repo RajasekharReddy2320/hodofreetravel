@@ -650,7 +650,7 @@ const Explore = () => {
       id: "connections" as const,
       label: "Connections",
       icon: Users,
-      badge: pendingReceived.length,
+      badge: connections.length,
     },
   ];
 
