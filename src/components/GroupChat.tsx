@@ -8,7 +8,7 @@ import { Send, Plane } from "lucide-react";
 import { GroupTripPlanner } from "./GroupTripPlanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
 interface Message {
   id: string;
@@ -136,6 +136,12 @@ export const GroupChat = ({ groupId, groupTitle, fromLocation, toLocation, trave
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
+  const getDateLabel = (date: Date) => {
+    if (isToday(date)) return "Today";
+    if (isYesterday(date)) return "Yesterday";
+    return format(date, "MMMM d, yyyy");
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,53 +161,65 @@ export const GroupChat = ({ groupId, groupTitle, fromLocation, toLocation, trave
             </div>
           </DialogHeader>
         
-          {/* Custom styled chat area with grey background */}
+          {/* White background with grey message bubbles */}
           <ScrollArea 
-            className="flex-1 px-4" 
+            className="flex-1 px-4 bg-background" 
             ref={scrollRef}
-            style={{ backgroundColor: '#808080' }}
           >
             <div className="space-y-4 py-4">
               {messages.length === 0 ? (
-                <div className="text-center py-8 text-white/70">
+                <div className="text-center py-8 text-muted-foreground">
                   No messages yet. Start the conversation!
                 </div>
               ) : (
-                messages.map((message) => {
+                messages.map((message, index) => {
                   const isOwnMessage = message.user_id === currentUserId;
+                  const messageDate = new Date(message.created_at);
+                  const prevMessage = index > 0 ? messages[index - 1] : null;
+                  const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
+                  const showDateSeparator = !prevDate || !isSameDay(messageDate, prevDate);
+
                   return (
-                    <div
-                      key={message.id}
-                      className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-                    >
-                      <Avatar className="h-8 w-8 border-2 border-white/20">
-                        <AvatarImage src={message.profiles.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs bg-white/20 text-white">
-                          {getInitials(message.profiles.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className={`flex-1 ${isOwnMessage ? "text-right" : ""}`}>
-                        <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? "justify-end" : ""}`}>
-                          <span className="text-sm font-medium text-white" style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}>
-                            {isOwnMessage ? "You" : message.profiles.full_name || "Unknown"}
-                          </span>
-                          <span className="text-xs text-white/60">
-                            {format(new Date(message.created_at), "HH:mm")}
-                          </span>
+                    <div key={message.id}>
+                      {showDateSeparator && (
+                        <div className="flex items-center justify-center my-4">
+                          <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                            {getDateLabel(messageDate)}
+                          </div>
                         </div>
-                        <div
-                          className={`inline-block p-3 rounded-2xl max-w-[80%] ${
-                            isOwnMessage
-                              ? "bg-primary text-primary-foreground rounded-tr-sm"
-                              : "bg-white/20 text-white rounded-tl-sm"
-                          }`}
-                        >
-                          <p 
-                            className="text-sm whitespace-pre-wrap break-words"
-                            style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
+                      )}
+                      <div
+                        className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
+                      >
+                        <Avatar className="h-8 w-8 border-2 border-muted">
+                          <AvatarImage src={message.profiles.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs bg-muted text-muted-foreground">
+                            {getInitials(message.profiles.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className={`flex-1 ${isOwnMessage ? "text-right" : ""}`}>
+                          <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? "justify-end" : ""}`}>
+                            <span className="text-sm font-medium text-foreground" style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}>
+                              {isOwnMessage ? "You" : message.profiles.full_name || "Unknown"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(messageDate, "HH:mm")}
+                            </span>
+                          </div>
+                          <div
+                            className={`inline-block p-3 rounded-2xl max-w-[80%] ${
+                              isOwnMessage
+                                ? "bg-primary text-primary-foreground rounded-tr-sm"
+                                : "bg-muted text-foreground rounded-tl-sm"
+                            }`}
                           >
-                            {message.content}
-                          </p>
+                            <p 
+                              className="text-sm whitespace-pre-wrap break-words"
+                              style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
+                            >
+                              {message.content}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>

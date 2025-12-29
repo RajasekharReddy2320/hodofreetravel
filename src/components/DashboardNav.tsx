@@ -3,17 +3,38 @@ import { Search, User, Plane, Compass, Ticket, ShoppingCart, Menu, X } from "luc
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useCart } from "@/contexts/CartContext";
-
 
 const DashboardNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNavExpanded, setIsNavExpanded] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
   const { itemCount } = useCart();
-  
+
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+    
+    if (currentScrollY < 50) {
+      setIsVisible(true);
+    } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      // Scrolling down
+      setIsVisible(false);
+    } else if (currentScrollY < lastScrollY) {
+      // Scrolling up
+      setIsVisible(true);
+    }
+    
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY]);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -26,7 +47,12 @@ const DashboardNav = () => {
 
   return (
     <nav 
-      className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      className={`sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-transform duration-300 ${
+        isVisible ? "translate-y-0" : "-translate-y-full"
+      }`}
+      style={{
+        boxShadow: isVisible ? "0 4px 30px rgba(0, 0, 0, 0.1)" : "none",
+      }}
     >
       <div className="container flex h-16 items-center gap-2 px-4">
         {/* Logo */}

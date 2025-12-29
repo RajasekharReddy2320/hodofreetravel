@@ -26,6 +26,7 @@ import BookConfirm from "./pages/BookConfirm";
 import MyTickets from "./pages/MyTickets";
 import TicketDetails from "./pages/TicketDetails";
 import Cart from "./pages/Cart";
+import CreatePost from "./pages/CreatePost";
 
 import NotFound from "./pages/NotFound";
 import TravelAgents from "./pages/TravelAgents";
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="/my-tickets" element={<MyTickets />} />
               <Route path="/ticket-details" element={<TicketDetails />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/create-post" element={<CreatePost />} />
               
               <Route path="/book" element={<Book />} />
               <Route path="/travel-agents" element={<TravelAgents />} />

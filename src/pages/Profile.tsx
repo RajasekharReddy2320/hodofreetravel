@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, Heart, Menu } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -65,7 +65,9 @@ const Profile = () => {
   
   // Saved posts state
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
+  const [likedPosts, setLikedPosts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("posts");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Review state
   const [rating, setRating] = useState(0);
@@ -289,7 +291,23 @@ const Profile = () => {
         supabase.from("travel_group_members").select("group_id").eq("user_id", currentId).eq("status", "accepted"),
       ]);
 
-      if (likesData.data) setUserLikes(new Set(likesData.data.map((l: any) => l.post_id)));
+      if (likesData.data) {
+        setUserLikes(new Set(likesData.data.map((l: any) => l.post_id)));
+        
+        // Fetch liked posts details
+        const likedPostIds = likesData.data.map((l: any) => l.post_id);
+        if (likedPostIds.length > 0) {
+          const { data: likedPostsData } = await supabase
+            .from("posts")
+            .select(`*, profiles:user_id (full_name, avatar_url)`)
+            .in("id", likedPostIds)
+            .order("created_at", { ascending: false });
+          
+          if (likedPostsData) {
+            setLikedPosts(likedPostsData);
+          }
+        }
+      }
       if (savesData.data) {
         setUserSaves(new Set(savesData.data.map((s: any) => s.post_id)));
         
@@ -673,7 +691,7 @@ const Profile = () => {
         {/* Content Tabs */}
         <div className="px-4 md:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-5 bg-muted/50 rounded-xl p-1">
+            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-6' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1`}>
               <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <Grid3X3 className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Posts</span>
@@ -691,10 +709,16 @@ const Profile = () => {
                 <span className="hidden md:inline">Tickets</span>
               </TabsTrigger>
               {isOwnProfile && (
-                <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Bookmark className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Saved</span>
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                    <Bookmark className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Saved</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="liked" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                    <Heart className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Liked</span>
+                  </TabsTrigger>
+                </>
               )}
             </TabsList>
 
@@ -912,6 +936,40 @@ const Profile = () => {
                 ) : (
                   <div className="grid grid-cols-3 gap-1 md:gap-3">
                     {savedPosts.map((post) => (
+                      <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                        {post.image_url ? (
+                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                            <p className="text-xs text-center line-clamp-4">{post.content}</p>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            )}
+
+            {/* Liked Tab */}
+            {isOwnProfile && (
+              <TabsContent value="liked" className="mt-6 space-y-6">
+                {likedPosts.length === 0 ? (
+                  <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                    <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                    <h3 className="font-semibold text-lg mb-1">No liked posts</h3>
+                    <p className="text-muted-foreground text-sm">Posts you like will appear here</p>
+                    <Button className="mt-4" onClick={() => navigate("/explore")}>
+                      Explore Posts
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1 md:gap-3">
+                    {likedPosts.map((post) => (
                       <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
                         {post.image_url ? (
                           <img src={post.image_url} alt="" className="w-full h-full object-cover" />

@@ -224,6 +224,7 @@ export type Database = {
           created_at: string
           id: string
           read: boolean | null
+          read_at: string | null
           recipient_id: string
           sender_id: string
         }
@@ -232,6 +233,7 @@ export type Database = {
           created_at?: string
           id?: string
           read?: boolean | null
+          read_at?: string | null
           recipient_id: string
           sender_id: string
         }
@@ -240,6 +242,7 @@ export type Database = {
           created_at?: string
           id?: string
           read?: boolean | null
+          read_at?: string | null
           recipient_id?: string
           sender_id?: string
         }
@@ -890,6 +893,27 @@ export type Database = {
           title?: string
           trip_type?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      typing_indicators: {
+        Row: {
+          id: string
+          recipient_id: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          recipient_id: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          recipient_id?: string
+          started_at?: string
           user_id?: string
         }
         Relationships: []

@@ -31,8 +31,10 @@ import {
   Plane,
   Menu,
   ChevronLeft,
+  PlusCircle,
+  CheckCheck,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, isSameDay } from "date-fns";
 import { z } from "zod";
 
 // --- Interfaces ---
@@ -69,6 +71,7 @@ interface Message {
   recipient_id: string;
   content: string;
   read: boolean;
+  read_at: string | null;
   created_at: string;
 }
 interface Conversation {
@@ -622,6 +625,13 @@ const Explore = () => {
       icon: Rss,
     },
     {
+      id: "create-post" as const,
+      label: "Create Post",
+      icon: PlusCircle,
+      isLink: true,
+      href: "/create-post",
+    },
+    {
       id: "messages" as const,
       label: "Messages",
       icon: MessageSquare,
@@ -676,10 +686,35 @@ const Explore = () => {
           <div className="px-2 space-y-1">
             {tabs.map((tabItem) => {
               const Icon = tabItem.icon;
+              
+              // Handle create-post as a link
+              if ('isLink' in tabItem && tabItem.isLink && 'href' in tabItem) {
+                return (
+                  <button
+                    key={tabItem.id}
+                    onClick={() => navigate(tabItem.href as string)}
+                    className={`
+                      flex items-center transition-all duration-200 rounded-lg group
+                      ${isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-4 justify-center"}
+                      hover:bg-muted text-muted-foreground hover:text-foreground
+                    `}
+                    title={!isSidebarOpen ? tabItem.label : undefined}
+                  >
+                    <Icon
+                      className={`
+                      shrink-0 transition-all
+                      ${isSidebarOpen ? "h-5 w-5" : "h-6 w-6"} 
+                    `}
+                    />
+                    {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
+                  </button>
+                );
+              }
+              
               return (
                 <button
                   key={tabItem.id}
-                  onClick={() => handleTabChange(tabItem.id)}
+                  onClick={() => handleTabChange(tabItem.id as TabType)}
                   className={`
                     flex items-center transition-all duration-200 rounded-lg group
                     ${isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-4 justify-center"}
@@ -700,7 +735,7 @@ const Explore = () => {
 
                   {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
 
-                  {tabItem.badge && tabItem.badge > 0 && (
+                  {'badge' in tabItem && tabItem.badge && tabItem.badge > 0 && (
                     <span
                       className={`
                         bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center font-bold
@@ -725,7 +760,6 @@ const Explore = () => {
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
-              <CreatePostDialog onPostCreated={handlePostUpdate} />
             </div>
 
             {/* --- Feed Tab --- */}
@@ -971,19 +1005,51 @@ const Explore = () => {
                       </CardHeader>
                       <CardContent className="flex-1 p-0">
                         <ScrollArea className="h-[300px] p-4">
-                          {messages.map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`mb-4 flex ${msg.sender_id === currentUserId ? "justify-end" : "justify-start"}`}
-                            >
-                              <div
-                                className={`max-w-[70%] rounded-lg p-3 ${msg.sender_id === currentUserId ? `${currentTheme.primary} text-white` : currentTheme.secondary}`}
-                              >
-                                <p className="text-sm">{msg.content}</p>
-                                <p className="text-xs mt-1 opacity-70">{format(new Date(msg.created_at), "h:mm a")}</p>
+                          {messages.map((msg, index) => {
+                            const messageDate = new Date(msg.created_at);
+                            const prevMessage = index > 0 ? messages[index - 1] : null;
+                            const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
+                            const showDateSeparator = !prevDate || !isSameDay(messageDate, prevDate);
+                            
+                            const getDateLabel = (date: Date) => {
+                              if (isToday(date)) return "Today";
+                              if (isYesterday(date)) return "Yesterday";
+                              return format(date, "MMMM d, yyyy");
+                            };
+
+                            return (
+                              <div key={msg.id}>
+                                {showDateSeparator && (
+                                  <div className="flex items-center justify-center my-4">
+                                    <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                                      {getDateLabel(messageDate)}
+                                    </div>
+                                  </div>
+                                )}
+                                <div
+                                  className={`mb-4 flex ${msg.sender_id === currentUserId ? "justify-end" : "justify-start"}`}
+                                >
+                                  <div
+                                    className={`max-w-[70%] rounded-lg p-3 ${msg.sender_id === currentUserId ? `${currentTheme.primary} text-white` : currentTheme.secondary}`}
+                                  >
+                                    <p className="text-sm">{msg.content}</p>
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <p className="text-xs opacity-70">{format(messageDate, "h:mm a")}</p>
+                                      {msg.sender_id === currentUserId && (
+                                        <span className="text-xs opacity-70">
+                                          {msg.read ? (
+                                            <CheckCheck className="h-3 w-3 text-blue-400" />
+                                          ) : (
+                                            <Check className="h-3 w-3" />
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </ScrollArea>
                       </CardContent>
                       <div className="p-4 border-t">
