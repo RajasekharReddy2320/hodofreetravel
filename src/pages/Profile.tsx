@@ -13,11 +13,14 @@ import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { z } from "zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PostCard } from "@/components/PostCard";
 import { TravelGroupCard } from "@/components/TravelGroupCard";
 import { formatDistanceToNow } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ProfileSidebar from "@/components/ProfileSidebar";
+import ProfilePhotoUpload from "@/components/ProfilePhotoUpload";
+import { cn } from "@/lib/utils";
 
 const reviewSchema = z.object({
   rating: z.number().min(1, "Please select a rating").max(5),
@@ -533,12 +536,27 @@ const Profile = () => {
 
   if (!profile) return null;
 
+  const handlePhotoUpdated = (newUrl: string) => {
+    setProfile(prev => prev ? { ...prev, avatar_url: newUrl } : null);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
 
+      {/* Profile Sidebar */}
+      <ProfileSidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isOwnProfile={isOwnProfile}
+      />
 
-      <main className="max-w-4xl mx-auto pb-20">
+      <main className={cn(
+        "max-w-4xl mx-auto pb-20 transition-all duration-300",
+        isSidebarOpen ? "md:ml-64" : "md:ml-16"
+      )}>
         {/* Instagram-style Profile Header */}
         <div className="relative">
           {/* Cover/Gradient Background */}
@@ -556,9 +574,12 @@ const Profile = () => {
                   </AvatarFallback>
                 </Avatar>
                 {isOwnProfile && (
-                  <button className="absolute bottom-1 right-1 p-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform">
-                    <Camera className="h-4 w-4" />
-                  </button>
+                  <ProfilePhotoUpload
+                    currentAvatarUrl={profile.avatar_url}
+                    userId={profile.id}
+                    fullName={profile.full_name}
+                    onPhotoUpdated={handlePhotoUpdated}
+                  />
                 )}
               </div>
 
@@ -688,41 +709,23 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Content Tabs */}
+        {/* Content Section - controlled by sidebar */}
         <div className="px-4 md:px-8 mt-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-6' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1`}>
-              <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Grid3X3 className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Posts</span>
-              </TabsTrigger>
-              <TabsTrigger value="trips" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Globe className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Trips</span>
-              </TabsTrigger>
-              <TabsTrigger value="groups" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <UsersIcon className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Groups</span>
-              </TabsTrigger>
-              <TabsTrigger value="bookings" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Ticket className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Tickets</span>
-              </TabsTrigger>
-              {isOwnProfile && (
-                <>
-                  <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                    <Bookmark className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Saved</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="liked" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                    <Heart className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Liked</span>
-                  </TabsTrigger>
-                </>
-              )}
-            </TabsList>
+          {/* Active Tab Title */}
+          <h2 className="text-xl font-semibold mb-6 capitalize flex items-center gap-2">
+            {activeTab === "posts" && <><Grid3X3 className="h-5 w-5" /> Posts</>}
+            {activeTab === "trips" && <><Globe className="h-5 w-5" /> Trips</>}
+            {activeTab === "groups" && <><UsersIcon className="h-5 w-5" /> Groups</>}
+            {activeTab === "bookings" && <><Ticket className="h-5 w-5" /> Tickets</>}
+            {activeTab === "saved" && <><Bookmark className="h-5 w-5" /> Saved Posts</>}
+            {activeTab === "liked" && <><Heart className="h-5 w-5" /> Liked Posts</>}
+            {activeTab === "wallet" && <><Wallet className="h-5 w-5" /> Wallet</>}
+            {activeTab === "settings" && <><Settings className="h-5 w-5" /> Settings</>}
+          </h2>
 
-            <TabsContent value="posts" className="mt-6">
+          {/* Posts Tab */}
+          {activeTab === "posts" && (
+            <div className="space-y-4">
               {userPosts.length === 0 ? (
                 <div className="text-center py-16 bg-muted/30 rounded-2xl">
                   <Camera className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
@@ -748,9 +751,12 @@ const Profile = () => {
                   ))}
                 </div>
               )}
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="trips" className="mt-6 space-y-4">
+          {/* Trips Tab */}
+          {activeTab === "trips" && (
+            <div className="space-y-4">
               {userTrips.length === 0 ? (
                 <div className="text-center py-16 bg-muted/30 rounded-2xl">
                   <Globe className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
@@ -779,9 +785,12 @@ const Profile = () => {
                   ))}
                 </div>
               )}
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="groups" className="mt-6 space-y-4">
+          {/* Groups Tab */}
+          {activeTab === "groups" && (
+            <div className="space-y-4">
               {userGroups.length === 0 ? (
                 <div className="text-center py-16 bg-muted/30 rounded-2xl">
                   <UsersIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
@@ -801,9 +810,12 @@ const Profile = () => {
                   ))}
                 </div>
               )}
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="bookings" className="mt-6 space-y-4">
+          {/* Bookings Tab */}
+          {activeTab === "bookings" && (
+            <div className="space-y-4">
               {(() => {
                 const now = new Date();
                 const upcomingBookings = userBookings.filter(b => 
@@ -919,76 +931,135 @@ const Profile = () => {
                   </Tabs>
                 );
               })()}
-            </TabsContent>
+            </div>
+          )}
 
-            {/* Saved Tab */}
-            {isOwnProfile && (
-              <TabsContent value="saved" className="mt-6 space-y-6">
-                {savedPosts.length === 0 ? (
-                  <div className="text-center py-16 bg-muted/30 rounded-2xl">
-                    <Bookmark className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                    <h3 className="font-semibold text-lg mb-1">No saved posts</h3>
-                    <p className="text-muted-foreground text-sm">Posts you save will appear here</p>
-                    <Button className="mt-4" onClick={() => navigate("/explore")}>
-                      Explore Posts
+          {/* Saved Tab */}
+          {isOwnProfile && activeTab === "saved" && (
+            <div className="space-y-6">
+              {savedPosts.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Bookmark className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No saved posts</h3>
+                  <p className="text-muted-foreground text-sm">Posts you save will appear here</p>
+                  <Button className="mt-4" onClick={() => navigate("/explore")}>
+                    Explore Posts
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 md:gap-3">
+                  {savedPosts.map((post) => (
+                    <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                      {post.image_url ? (
+                        <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                          <p className="text-xs text-center line-clamp-4">{post.content}</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                        <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                        <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Liked Tab */}
+          {isOwnProfile && activeTab === "liked" && (
+            <div className="space-y-6">
+              {likedPosts.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No liked posts</h3>
+                  <p className="text-muted-foreground text-sm">Posts you like will appear here</p>
+                  <Button className="mt-4" onClick={() => navigate("/explore")}>
+                    Explore Posts
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 md:gap-3">
+                  {likedPosts.map((post) => (
+                    <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                      {post.image_url ? (
+                        <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                          <p className="text-xs text-center line-clamp-4">{post.content}</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                        <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                        <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Wallet Tab */}
+          {isOwnProfile && activeTab === "wallet" && (
+            <div className="space-y-6">
+              <Card className="bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10 border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Available Balance</p>
+                      <p className="text-3xl font-bold">₹{walletBalance.toLocaleString()}</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+                      <Wallet className="h-8 w-8" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <div className="text-center py-8 bg-muted/30 rounded-2xl">
+                <p className="text-muted-foreground">Transaction history coming soon</p>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {isOwnProfile && activeTab === "settings" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Public Profile</p>
+                      <p className="text-sm text-muted-foreground">Allow others to see your profile</p>
+                    </div>
+                    <Switch
+                      checked={profile.is_public}
+                      onCheckedChange={(checked) => {
+                        setProfile({ ...profile, is_public: checked });
+                        handleSave();
+                      }}
+                    />
+                  </div>
+                  <div className="pt-4 border-t">
+                    <Button variant="outline" onClick={() => setEditing(true)} className="w-full">
+                      Edit Profile Details
                     </Button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-1 md:gap-3">
-                    {savedPosts.map((post) => (
-                      <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
-                        {post.image_url ? (
-                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
-                            <p className="text-xs text-center line-clamp-4">{post.content}</p>
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
-                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
-                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            )}
-
-            {/* Liked Tab */}
-            {isOwnProfile && (
-              <TabsContent value="liked" className="mt-6 space-y-6">
-                {likedPosts.length === 0 ? (
-                  <div className="text-center py-16 bg-muted/30 rounded-2xl">
-                    <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                    <h3 className="font-semibold text-lg mb-1">No liked posts</h3>
-                    <p className="text-muted-foreground text-sm">Posts you like will appear here</p>
-                    <Button className="mt-4" onClick={() => navigate("/explore")}>
-                      Explore Posts
+                  <div className="pt-4">
+                    <Button variant="destructive" onClick={handleLogout} className="w-full">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
                     </Button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-1 md:gap-3">
-                    {likedPosts.map((post) => (
-                      <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
-                        {post.image_url ? (
-                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
-                            <p className="text-xs text-center line-clamp-4">{post.content}</p>
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
-                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
-                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            )}
-          </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Edit Profile Section */}
