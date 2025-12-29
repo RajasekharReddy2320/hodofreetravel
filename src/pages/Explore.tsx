@@ -31,12 +31,11 @@ import {
   Plane,
   Menu,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
 
-// ... [Keep all your existing Interfaces: Post, Profile, Connection, Message, etc.] ...
+// --- Interfaces ---
 interface Post {
   id: string;
   content: string;
@@ -77,7 +76,6 @@ interface Conversation {
   lastMessage: Message | null;
   unreadCount: number;
 }
-
 interface TravelGroup {
   id: string;
   title: string;
@@ -94,7 +92,6 @@ interface TravelGroup {
   };
   member_count: number;
 }
-
 interface BuddySearchResult {
   id: string;
   full_name: string | null;
@@ -105,7 +102,6 @@ interface BuddySearchResult {
   connection_status: string;
 }
 
-// ... [Keep MESSAGE_THEMES and Schemas] ...
 const MESSAGE_THEMES = [
   {
     id: "default",
@@ -174,7 +170,7 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  // NEW: State for YouTube-style sidebar
+  // Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -188,19 +184,6 @@ const Explore = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyTravelers, setNearbyTravelers] = useState<BuddySearchResult[]>([]);
   const [locationError, setLocationError] = useState<string | null>(null);
-
-  // Sync tab from URL
-  useEffect(() => {
-    if (tab && VALID_TABS.includes(tab as TabType)) {
-      setActiveTab(tab as TabType);
-    }
-  }, [tab]);
-
-  // Update URL when tab changes
-  const handleTabChange = (newTab: TabType) => {
-    setActiveTab(newTab);
-    navigate(`/explore/${newTab}`, { replace: true });
-  };
 
   // Posts state
   const [posts, setPosts] = useState<Post[]>([]);
@@ -229,6 +212,18 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
+  // Sync tab from URL
+  useEffect(() => {
+    if (tab && VALID_TABS.includes(tab as TabType)) {
+      setActiveTab(tab as TabType);
+    }
+  }, [tab]);
+
+  const handleTabChange = (newTab: TabType) => {
+    setActiveTab(newTab);
+    navigate(`/explore/${newTab}`, { replace: true });
+  };
+
   useEffect(() => {
     checkAuthAndLoad();
   }, []);
@@ -254,58 +249,323 @@ const Explore = () => {
     setIsLoading(false);
   };
 
-  // ... [Keep all your existing helper functions: loadTravelGroups, loadPosts, loadConnections, etc.] ...
-  // (I am omitting the body of these functions to save space, assuming they remain unchanged as requested)
+  // --- RESTORED LOGIC START ---
+
+  // Travel Groups functions
   const loadTravelGroups = async () => {
-    /* ... existing code ... */ setTravelGroups([]);
+    const { data, error } = await supabase
+      .from("travel_groups")
+      .select(`*, profiles:creator_id (full_name, avatar_url)`)
+      .gte("travel_date", new Date().toISOString().split("T")[0])
+      .order("travel_date", { ascending: true });
+
+    if (error) {
+      console.error("Error loading travel groups:", error);
+      return;
+    }
+
+    const groupsWithCounts = await Promise.all(
+      (data || []).map(async (group: any) => {
+        const { count } = await (supabase as any)
+          .from("travel_group_members")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", group.id)
+          .eq("status", "accepted");
+        return { ...group, member_count: count || 0 };
+      }),
+    );
+    setTravelGroups(groupsWithCounts as any);
   };
+
   const loadUserGroupMemberships = async (userId: string) => {
-    /* ... existing code ... */
+    const { data } = await supabase
+      .from("travel_group_members")
+      .select("group_id")
+      .eq("user_id", userId)
+      .eq("status", "accepted");
+    if (data) {
+      setUserGroupMemberships(new Set(data.map((m) => m.group_id)));
+    }
   };
+
   const handleGroupUpdate = () => {
-    /* ... existing code ... */
+    loadTravelGroups();
+    if (currentUserId) {
+      loadUserGroupMemberships(currentUserId);
+    }
   };
+
+  // Search Logic
   const performBuddySearch = async () => {
-    /* ... existing code ... */ setBuddySearchLoading(false);
+    if (!currentUserId) return;
+    setBuddySearchLoading(true);
+    try {
+      let query = supabase.from("profiles").select("*").neq("id", currentUserId);
+      if (buddySearchQuery.trim()) query = query.ilike("full_name", `%${buddySearchQuery}%`);
+      if (buddyDestination.trim())
+        query = query.or(
+          `home_location.ilike.%${buddyDestination}%,country.ilike.%${buddyDestination}%,state.ilike.%${buddyDestination}%`,
+        );
+      if (buddyInterest) query = query.contains("interests", [buddyInterest]);
+
+      const { data: profiles, error } = await query.limit(20);
+      if (error) throw error;
+
+      const profilesWithStatus = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: statusData } = await supabase.rpc("get_connection_status", {
+            user1_id: currentUserId,
+            user2_id: profile.id,
+          });
+          return { ...profile, connection_status: statusData || "none" };
+        }),
+      );
+      setBuddySearchResults(profilesWithStatus);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setBuddySearchLoading(false);
+    }
   };
+
   const sendBuddyConnectionRequest = async (targetUserId: string) => {
-    /* ... existing code ... */
+    if (!currentUserId) return;
+    try {
+      const { error } = await supabase.from("user_connections").insert({
+        requester_id: currentUserId,
+        addressee_id: targetUserId,
+        status: "pending",
+      });
+      if (error) throw error;
+      toast({ title: "Request Sent", description: "Connection request sent successfully" });
+      performBuddySearch();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   };
+
+  // Geolocation
   const requestLocation = async () => {
-    /* ... existing code ... */
+    setLocationError(null);
+    setNearbyLoading(true);
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setNearbyLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        await loadNearbyTravelers(latitude, longitude);
+        setNearbyLoading(false);
+      },
+      (error) => {
+        setNearbyLoading(false);
+        setLocationError("Location request failed.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
   };
+
   const loadNearbyTravelers = async (lat: number, lng: number) => {
-    /* ... existing code ... */
+    if (!currentUserId) return;
+    try {
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("country, state, home_location")
+        .eq("id", currentUserId)
+        .single();
+      let query = supabase.from("profiles").select("*").neq("id", currentUserId);
+      if (userProfile?.country) query = query.eq("country", userProfile.country);
+      const { data: profiles, error } = await query.limit(20);
+      if (error) throw error;
+
+      const profilesWithStatus = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: statusData } = await supabase.rpc("get_connection_status", {
+            user1_id: currentUserId,
+            user2_id: profile.id,
+          });
+          return { ...profile, connection_status: statusData || "none" };
+        }),
+      );
+      setNearbyTravelers(profilesWithStatus);
+      toast({ title: "Location enabled", description: `Found ${profilesWithStatus.length} travelers in your area` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   };
+
+  // --- POSTS FUNCTIONS (RESTORED) ---
   const loadPosts = async () => {
-    /* ... existing code ... */ setPosts([]);
+    const { data, error } = await supabase
+      .from("posts")
+      .select(
+        `
+        *,
+        profiles:user_id (full_name, avatar_url)
+      `,
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Error loading posts", description: error.message, variant: "destructive" });
+      return;
+    }
+    setPosts(data as any);
   };
+
   const loadUserInteractions = async (userId: string) => {
-    /* ... existing code ... */
+    const [likesData, savesData] = await Promise.all([
+      supabase.from("post_likes").select("post_id").eq("user_id", userId),
+      supabase.from("post_saves").select("post_id").eq("user_id", userId),
+    ]);
+    if (likesData.data) setUserLikes(new Set(likesData.data.map((l: any) => l.post_id)));
+    if (savesData.data) setUserSaves(new Set(savesData.data.map((s: any) => s.post_id)));
   };
+
   const handlePostUpdate = () => {
-    /* ... existing code ... */
+    if (currentUserId) {
+      loadPosts();
+      loadUserInteractions(currentUserId);
+    }
   };
+
+  // Connections functions
   const loadConnections = async (userId: string) => {
-    /* ... existing code ... */
+    const { data: accepted } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("status", "accepted")
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+    if (accepted) {
+      const userIds = [...new Set(accepted.flatMap((c) => [c.requester_id, c.addressee_id]))];
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
+      const connectionsWithProfiles = accepted.map((conn) => ({
+        ...conn,
+        requester: profileMap.get(conn.requester_id),
+        addressee: profileMap.get(conn.addressee_id),
+      }));
+      setConnections(connectionsWithProfiles as Connection[]);
+    }
+    // Pending Received
+    const { data: received } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("addressee_id", userId)
+      .eq("status", "pending");
+    if (received) {
+      const userIds = received.map((r) => r.requester_id);
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
+      const requestsWithProfiles = received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) }));
+      setPendingReceived(requestsWithProfiles as Connection[]);
+    }
+    // Pending Sent
+    const { data: sent } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("requester_id", userId)
+      .eq("status", "pending");
+    if (sent) {
+      const userIds = sent.map((s) => s.addressee_id);
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
+      const requestsWithProfiles = sent.map((req) => ({ ...req, addressee: profileMap.get(req.addressee_id) }));
+      setPendingSent(requestsWithProfiles as Connection[]);
+    }
   };
+
   const acceptConnection = async (connectionId: string) => {
-    /* ... existing code ... */
+    const { error } = await supabase.from("user_connections").update({ status: "accepted" }).eq("id", connectionId);
+    if (error) {
+      toast({ title: "Error", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Connection Accepted", description: "You are now connected!" });
+    if (currentUserId) loadConnections(currentUserId);
   };
+
   const rejectConnection = async (connectionId: string) => {
-    /* ... existing code ... */
+    const { error } = await supabase.from("user_connections").delete().eq("id", connectionId);
+    if (error) {
+      toast({ title: "Error", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Request Rejected" });
+    if (currentUserId) loadConnections(currentUserId);
   };
+
   const removeConnection = async (connectionId: string) => {
-    /* ... existing code ... */
+    const { error } = await supabase.from("user_connections").delete().eq("id", connectionId);
+    if (error) {
+      toast({ title: "Error", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Connection Removed" });
+    if (currentUserId) loadConnections(currentUserId);
   };
+
+  // Messages functions
   const loadAllUsers = async () => {
-    /* ... existing code ... */
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from("public_profiles").select("id, full_name, avatar_url").neq("id", user.id);
+    setAllUsers(data || []);
   };
+
   const loadConversations = async () => {
-    /* ... existing code ... */
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: allMessages } = await supabase
+      .from("messages")
+      .select("*")
+      .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+      .order("created_at", { ascending: false });
+    const userIds = new Set<string>();
+    allMessages?.forEach((msg) => {
+      if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
+      if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
+    });
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", Array.from(userIds));
+    const convos: Conversation[] = [];
+    profiles?.forEach((profile) => {
+      const userMessages =
+        allMessages?.filter((msg) => msg.sender_id === profile.id || msg.recipient_id === profile.id) || [];
+      const unreadCount = userMessages.filter(
+        (msg) => msg.recipient_id === user.id && msg.sender_id === profile.id && !msg.read,
+      ).length;
+      convos.push({ user: profile, lastMessage: userMessages[0] || null, unreadCount });
+    });
+    setConversations(convos);
   };
+
   const loadMessages = async () => {
-    /* ... existing code ... */
+    if (!selectedUser || !currentUserId) return;
+    const { data } = await supabase
+      .from("messages")
+      .select("*")
+      .or(
+        `and(sender_id.eq.${currentUserId},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${currentUserId})`,
+      )
+      .order("created_at", { ascending: true });
+    setMessages(data || []);
+    await supabase
+      .from("messages")
+      .update({ read: true })
+      .eq("recipient_id", currentUserId)
+      .eq("sender_id", selectedUser.id)
+      .eq("read", false);
+    loadConversations();
   };
 
   useEffect(() => {
@@ -313,8 +573,24 @@ const Explore = () => {
   }, [selectedUser]);
 
   const sendMessage = async () => {
-    /* ... existing code ... */
+    if (!selectedUser || !currentUserId) return;
+    const validation = messageSchema.safeParse({ content: messageText });
+    if (!validation.success) {
+      toast({ title: "Invalid Message", description: validation.error.issues[0].message, variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase
+      .from("messages")
+      .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content });
+    if (error) {
+      toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+      return;
+    }
+    setMessageText("");
+    loadMessages();
+    loadConversations();
   };
+
   const getInitials = (name: string | null) => {
     if (!name) return "U";
     return name
@@ -327,15 +603,29 @@ const Explore = () => {
   const filteredUsers = allUsers.filter((user) => user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
   const currentTheme = MESSAGE_THEMES.find((t) => t.id === messageTheme) || MESSAGE_THEMES[0];
 
+  // Realtime Logic
   useEffect(() => {
     if (!currentUserId) return;
     const postsChannel = supabase
       .channel("posts-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts())
       .subscribe();
-    // ... [Rest of realtime logic]
+    const messagesChannel = supabase
+      .channel("messages")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `recipient_id=eq.${currentUserId}` },
+        (payload) => {
+          if (selectedUser && payload.new.sender_id === selectedUser.id) {
+            setMessages((prev) => [...prev, payload.new as Message]);
+          }
+          loadConversations();
+        },
+      )
+      .subscribe();
     return () => {
       supabase.removeChannel(postsChannel);
+      supabase.removeChannel(messagesChannel);
     };
   }, [currentUserId, selectedUser]);
 
@@ -390,20 +680,14 @@ const Explore = () => {
     <div className="min-h-screen bg-background">
       <DashboardNav />
 
-      {/* NEW LAYOUT STRUCTURE 
-        Sidebar is fixed left. Main content has left margin.
-      */}
-
       <div className="flex pt-20">
-        {" "}
-        {/* Offset for DashboardNav which is usually fixed/sticky */}
-        {/* YOUTUBE-STYLE SIDEBAR */}
+        {/* SIDEBAR */}
         <aside
           className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-background/95 backdrop-blur-sm border-r z-40 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
-          {/* Sidebar Toggle Button (Placed here since we can't edit DashboardNav) */}
+          {/* Toggle Button */}
           <div className={`flex items-center h-12 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -421,8 +705,8 @@ const Explore = () => {
                     flex items-center transition-all duration-200 rounded-lg group
                     ${
                       isSidebarOpen
-                        ? "w-full px-3 py-2 gap-4 flex-row justify-start" // Open: Row layout
-                        : "w-full py-4 gap-1 flex-col justify-center" // Closed: Column layout (Mini)
+                        ? "w-full px-3 py-2 gap-4 flex-row justify-start" // Open: Row
+                        : "w-full py-4 justify-center" // Closed: Just Icon centered
                     }
                     ${
                       activeTab === tabItem.id
@@ -440,15 +724,8 @@ const Explore = () => {
                   `}
                   />
 
-                  {/* Text Label */}
-                  <span
-                    className={`
-                    truncate font-medium transition-all
-                    ${isSidebarOpen ? "text-sm" : "text-[10px]"}
-                  `}
-                  >
-                    {tabItem.label}
-                  </span>
+                  {/* Text - Hidden when closed */}
+                  {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
 
                   {/* Badge */}
                   {tabItem.badge && tabItem.badge > 0 && (
@@ -458,7 +735,7 @@ const Explore = () => {
                         ${
                           isSidebarOpen
                             ? "ml-auto h-5 w-5"
-                            : "absolute top-2 right-2 h-4 w-4 text-[10px] ring-2 ring-background" // Float badge in mini mode
+                            : "absolute top-2 right-2 h-4 w-4 text-[10px] ring-2 ring-background"
                         }
                       `}
                     >
@@ -470,8 +747,8 @@ const Explore = () => {
             })}
           </div>
         </aside>
+
         {/* MAIN CONTENT AREA */}
-        {/* Margin left adjusts based on sidebar state */}
         <div
           className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6
           ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
@@ -480,10 +757,11 @@ const Explore = () => {
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
+              {/* This dialog calls handlePostUpdate which now works because loadPosts is restored */}
               <CreatePostDialog onPostCreated={handlePostUpdate} />
             </div>
 
-            {/* --- Existing Content Logic --- */}
+            {/* --- Feed Tab --- */}
             {activeTab === "feed" && (
               <div className="space-y-6">
                 {posts.length === 0 ? (
@@ -505,6 +783,7 @@ const Explore = () => {
               </div>
             )}
 
+            {/* --- Connections Tab --- */}
             {activeTab === "connections" && (
               <div className="space-y-6">
                 <div className="flex gap-2 border-b pb-4">
@@ -612,7 +891,7 @@ const Explore = () => {
               </div>
             )}
 
-            {/* Messages Tab */}
+            {/* --- Messages Tab --- */}
             {activeTab === "messages" && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-250px)] min-h-[500px]">
                 <Card className="md:col-span-1">
@@ -776,7 +1055,7 @@ const Explore = () => {
               </div>
             )}
 
-            {/* Saved Tab */}
+            {/* --- Saved Tab --- */}
             {activeTab === "saved" && (
               <div className="space-y-6">
                 {posts.filter((p) => userSaves.has(p.id)).length === 0 ? (
@@ -801,7 +1080,7 @@ const Explore = () => {
               </div>
             )}
 
-            {/* Find Buddies Tab */}
+            {/* --- Find Buddies Tab --- */}
             {activeTab === "find-buddies" && (
               <Card>
                 <CardHeader>
@@ -937,7 +1216,7 @@ const Explore = () => {
               </Card>
             )}
 
-            {/* Nearby Tab */}
+            {/* --- Nearby Tab --- */}
             {activeTab === "nearby" && (
               <Card>
                 <CardHeader>
@@ -1069,7 +1348,7 @@ const Explore = () => {
               </Card>
             )}
 
-            {/* Travel With Me Tab */}
+            {/* --- Travel With Me Tab --- */}
             {activeTab === "travel-with-me" && (
               <Card>
                 <CardHeader>
@@ -1085,7 +1364,7 @@ const Explore = () => {
               </Card>
             )}
 
-            {/* Travel Groups Tab */}
+            {/* --- Travel Groups Tab --- */}
             {activeTab === "travel-groups" && (
               <>
                 <div className="mb-6 flex justify-between items-center">
