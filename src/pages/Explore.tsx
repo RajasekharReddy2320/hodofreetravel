@@ -103,42 +103,12 @@ interface BuddySearchResult {
 }
 
 const MESSAGE_THEMES = [
-  {
-    id: "default",
-    name: "Default",
-    primary: "bg-primary",
-    secondary: "bg-muted",
-  },
-  {
-    id: "ocean",
-    name: "Ocean",
-    primary: "bg-blue-500",
-    secondary: "bg-blue-100",
-  },
-  {
-    id: "forest",
-    name: "Forest",
-    primary: "bg-green-600",
-    secondary: "bg-green-100",
-  },
-  {
-    id: "sunset",
-    name: "Sunset",
-    primary: "bg-orange-500",
-    secondary: "bg-orange-100",
-  },
-  {
-    id: "purple",
-    name: "Purple",
-    primary: "bg-purple-600",
-    secondary: "bg-purple-100",
-  },
-  {
-    id: "rose",
-    name: "Rose",
-    primary: "bg-pink-500",
-    secondary: "bg-pink-100",
-  },
+  { id: "default", name: "Default", primary: "bg-primary", secondary: "bg-muted" },
+  { id: "ocean", name: "Ocean", primary: "bg-blue-500", secondary: "bg-blue-100" },
+  { id: "forest", name: "Forest", primary: "bg-green-600", secondary: "bg-green-100" },
+  { id: "sunset", name: "Sunset", primary: "bg-orange-500", secondary: "bg-orange-100" },
+  { id: "purple", name: "Purple", primary: "bg-purple-600", secondary: "bg-purple-100" },
+  { id: "rose", name: "Rose", primary: "bg-pink-500", secondary: "bg-pink-100" },
 ];
 
 const messageSchema = z.object({
@@ -177,31 +147,23 @@ const Explore = () => {
   const [messageTheme, setMessageTheme] = useState("default");
   const [showThemePicker, setShowThemePicker] = useState(false);
 
-  // Nearby travelers state
+  // State for features
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyTravelers, setNearbyTravelers] = useState<BuddySearchResult[]>([]);
   const [locationError, setLocationError] = useState<string | null>(null);
-
-  // Posts state
   const [posts, setPosts] = useState<Post[]>([]);
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
   const [userSaves, setUserSaves] = useState<Set<string>>(new Set());
-
-  // Connections state
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pendingReceived, setPendingReceived] = useState<Connection[]>([]);
   const [pendingSent, setPendingSent] = useState<Connection[]>([]);
-
-  // Messages state
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
-
-  // Travel Buddies state
   const [travelGroups, setTravelGroups] = useState<TravelGroup[]>([]);
   const [userGroupMemberships, setUserGroupMemberships] = useState<Set<string>>(new Set());
   const [buddySearchQuery, setBuddySearchQuery] = useState("");
@@ -246,19 +208,17 @@ const Explore = () => {
     setIsLoading(false);
   };
 
-  // --- DATA LOADING LOGIC ---
+  // --- LOGIC FUNCTIONS (Restored) ---
   const loadTravelGroups = async () => {
     const { data, error } = await supabase
       .from("travel_groups")
       .select(`*, profiles:creator_id (full_name, avatar_url)`)
       .gte("travel_date", new Date().toISOString().split("T")[0])
       .order("travel_date", { ascending: true });
-
     if (error) {
       console.error("Error loading travel groups:", error);
       return;
     }
-
     const groupsWithCounts = await Promise.all(
       (data || []).map(async (group: any) => {
         const { count } = await (supabase as any)
@@ -278,9 +238,7 @@ const Explore = () => {
       .select("group_id")
       .eq("user_id", userId)
       .eq("status", "accepted");
-    if (data) {
-      setUserGroupMemberships(new Set(data.map((m) => m.group_id)));
-    }
+    if (data) setUserGroupMemberships(new Set(data.map((m) => m.group_id)));
   };
 
   const handleGroupUpdate = () => {
@@ -299,10 +257,8 @@ const Explore = () => {
           `home_location.ilike.%${buddyDestination}%,country.ilike.%${buddyDestination}%,state.ilike.%${buddyDestination}%`,
         );
       if (buddyInterest) query = query.contains("interests", [buddyInterest]);
-
       const { data: profiles, error } = await query.limit(20);
       if (error) throw error;
-
       const profilesWithStatus = await Promise.all(
         (profiles || []).map(async (profile) => {
           const { data: statusData } = await supabase.rpc("get_connection_status", {
@@ -369,7 +325,6 @@ const Explore = () => {
       if (userProfile?.country) query = query.eq("country", userProfile.country);
       const { data: profiles, error } = await query.limit(20);
       if (error) throw error;
-
       const profilesWithStatus = await Promise.all(
         (profiles || []).map(async (profile) => {
           const { data: statusData } = await supabase.rpc("get_connection_status", {
@@ -578,7 +533,6 @@ const Explore = () => {
       .join("")
       .toUpperCase();
   };
-
   const filteredUsers = allUsers.filter((user) => user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
   const currentTheme = MESSAGE_THEMES.find((t) => t.id === messageTheme) || MESSAGE_THEMES[0];
 
@@ -616,57 +570,31 @@ const Explore = () => {
   }
 
   const tabs = [
-    {
-      id: "feed" as const,
-      label: "Tramigos",
-      icon: Rss,
-    },
-    {
-      id: "messages" as const,
-      label: "Messages",
-      icon: MessageSquare,
-    },
-    {
-      id: "travel-groups" as const,
-      label: "Travel Groups",
-      icon: Plane,
-    },
-    {
-      id: "find-buddies" as const,
-      label: "Find Tramigos",
-      icon: Search,
-    },
-    {
-      id: "nearby" as const,
-      label: "Nearby",
-      icon: MapPin,
-    },
-    {
-      id: "travel-with-me" as const,
-      label: "Travel With Me",
-      icon: UserPlus,
-    },
-    {
-      id: "connections" as const,
-      label: "Connections",
-      icon: Users,
-      badge: connections.length,
-    },
+    { id: "feed" as const, label: "Tramigos", icon: Rss },
+    { id: "messages" as const, label: "Messages", icon: MessageSquare },
+    { id: "travel-groups" as const, label: "Travel Groups", icon: Plane },
+    { id: "find-buddies" as const, label: "Find Tramigos", icon: Search },
+    { id: "nearby" as const, label: "Nearby", icon: MapPin },
+    { id: "travel-with-me" as const, label: "Travel With Me", icon: UserPlus },
+    { id: "connections" as const, label: "Connections", icon: Users, badge: pendingReceived.length },
   ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* 1. Header (Normal flow, so it scrolls away) */}
-      <DashboardNav />
+      {/* 1. Header (Fixed to Top) */}
+      <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <DashboardNav />
+      </div>
 
-      {/* 2. Content Container (Flex container for sidebar + main) */}
-      <div className="flex flex-1 items-start">
-        {/* SIDEBAR: Sticky positioning makes it stick to the top when header scrolls out */}
+      {/* 2. Main Content Wrapper - Padded to avoid Header overlap */}
+      <div className="pt-16 min-h-screen">
+        {/* SIDEBAR: Fixed to the left, Starts below Header (top-16) */}
         <aside
-          className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
+          className={`fixed left-0 top-16 bottom-0 z-40 overflow-y-auto border-r bg-background/95 backdrop-blur-sm transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
+          {/* Toggle Button */}
           <div className={`flex items-center h-16 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -683,33 +611,15 @@ const Explore = () => {
                   className={`
                     flex items-center transition-all duration-200 rounded-lg group
                     ${isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-4 justify-center"}
-                    ${
-                      activeTab === tabItem.id
-                        ? "bg-primary/10 text-primary hover:bg-primary/20"
-                        : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                    }
+                    ${activeTab === tabItem.id ? "bg-primary/10 text-primary hover:bg-primary/20" : "hover:bg-muted text-muted-foreground hover:text-foreground"}
                   `}
                   title={!isSidebarOpen ? tabItem.label : undefined}
                 >
-                  <Icon
-                    className={`
-                    shrink-0 transition-all
-                    ${isSidebarOpen ? "h-5 w-5" : "h-6 w-6"} 
-                  `}
-                  />
-
+                  <Icon className={`shrink-0 transition-all ${isSidebarOpen ? "h-5 w-5" : "h-6 w-6"}`} />
                   {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
-
                   {tabItem.badge && tabItem.badge > 0 && (
                     <span
-                      className={`
-                        bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center font-bold
-                        ${
-                          isSidebarOpen
-                            ? "ml-auto h-5 w-5"
-                            : "absolute top-2 right-2 h-4 w-4 text-[10px] ring-2 ring-background"
-                        }
-                      `}
+                      className={`bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center font-bold ${isSidebarOpen ? "ml-auto h-5 w-5" : "absolute top-2 right-2 h-4 w-4 text-[10px] ring-2 ring-background"}`}
                     >
                       {tabItem.badge}
                     </span>
@@ -720,8 +630,12 @@ const Explore = () => {
           </div>
         </aside>
 
-        {/* MAIN CONTENT AREA: Expands to fill remaining width */}
-        <main className="flex-1 min-w-0 px-4 py-6">
+        {/* MAIN CONTENT: Margin adjusts based on sidebar width */}
+        <main
+          className={`transition-all duration-200 ease-in-out px-4 py-6
+            ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
+          `}
+        >
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
