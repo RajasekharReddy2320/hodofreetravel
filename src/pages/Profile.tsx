@@ -12,6 +12,7 @@ import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, User
 import { SecureVault } from "@/components/SecureVault";
 import DashboardNav from "@/components/DashboardNav";
 import ProfileSidebar from "@/components/ProfileSidebar";
+import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { z } from "zod";
@@ -1063,13 +1064,7 @@ const Profile = () => {
                     Sign Out
                   </Button>
                   
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <X className="h-4 w-4" />
-                    Delete Account
-                  </Button>
+                  <DeleteAccountDialog userEmail={profile.email} />
                 </CardContent>
               </Card>
             </TabsContent>}
