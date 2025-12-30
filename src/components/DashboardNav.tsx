@@ -91,7 +91,7 @@ const DashboardNav = () => {
               }`}
             >
               <Compass className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0" />
-              <span className="hidden lg:inline-block">Explore</span>
+              <span className="hidden lg:inline-block">Tramigos</span>
             </Link>
 
             <Link
