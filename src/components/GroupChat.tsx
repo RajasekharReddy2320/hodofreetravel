@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"; // Removed unused DialogHeader/Description imports to clean up
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, MapPin, Calendar, Trash2, MoreVertical, MessageSquare } from "lucide-react";
+import { Send, MapPin, Calendar, MoreVertical, MessageSquare, Map } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -75,7 +75,6 @@ export const GroupChat = ({
     if (!open) return;
 
     const fetchMessages = async () => {
-      // FIX: Cast supabase to 'any' to bypass strict table check for 'travel_group_messages'
       const { data, error } = await (supabase as any)
         .from("travel_group_messages")
         .select(`*, profiles:user_id(full_name, avatar_url)`)
@@ -96,23 +95,23 @@ export const GroupChat = ({
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT", // Only listening for inserts now since delete is removed
           schema: "public",
           table: "travel_group_messages",
           filter: `group_id=eq.${groupId}`,
         },
         async (payload) => {
-          if (payload.eventType === "INSERT") {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", payload.new.user_id)
-              .single();
-            const newMsg = { ...payload.new, profiles: profile } as GroupMessage;
-            setMessages((prev) => [...prev, newMsg]);
-          } else if (payload.eventType === "DELETE") {
-            setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
-          }
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", payload.new.user_id)
+            .single();
+          const newMsg = { ...payload.new, profiles: profile } as GroupMessage;
+
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
         },
       )
       .subscribe();
@@ -122,6 +121,7 @@ export const GroupChat = ({
     };
   }, [groupId, open]);
 
+  // Auto-scroll
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
@@ -134,37 +134,27 @@ export const GroupChat = ({
   const handleSend = async () => {
     if (!newMessage.trim()) return;
 
-    // FIX: Cast supabase to 'any' to bypass strict table check
+    const messageContent = newMessage.trim();
+    setNewMessage(""); // Optimistic clear
+
     const { error } = await (supabase as any).from("travel_group_messages").insert({
       group_id: groupId,
       user_id: currentUserId,
-      content: newMessage.trim(),
+      content: messageContent,
     });
 
     if (error) {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
-    } else {
-      setNewMessage("");
-    }
-  };
-
-  const handleDelete = async (messageId: string) => {
-    // FIX: Cast supabase to 'any' to bypass strict table check
-    const { error } = await (supabase as any).from("travel_group_messages").delete().eq("id", messageId);
-    if (error) {
-      toast({ title: "Error", description: "Could not delete message", variant: "destructive" });
-    } else {
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
-      toast({ title: "Message deleted" });
+      setNewMessage(messageContent); // Restore text on fail
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md h-[80vh] flex flex-col p-0 gap-0 overflow-hidden border-none shadow-xl">
-        {/* Header */}
-        <div className="border-b px-4 py-3 bg-muted/40 flex items-center justify-between shrink-0">
-          <div className="flex flex-col gap-1 pr-10 min-w-0">
+        {/* --- Header --- */}
+        <div className="border-b px-4 py-3 bg-muted/40 flex items-center justify-between shrink-0 gap-2">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
             <DialogTitle className="text-base font-semibold leading-none truncate">{groupTitle}</DialogTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 truncate">
               <span className="flex items-center gap-0.5 truncate">
@@ -177,7 +167,14 @@ export const GroupChat = ({
             </div>
           </div>
 
+          {/* Action Buttons */}
           <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 px-2">
+              <Map className="h-3.5 w-3.5" />
+              <span className="hidden xs:inline">Plan Trip</span>
+              <span className="xs:hidden">Plan</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -192,7 +189,7 @@ export const GroupChat = ({
           </div>
         </div>
 
-        {/* Chat Area */}
+        {/* --- Chat Area --- */}
         <div className="flex-1 overflow-hidden relative bg-background" ref={scrollAreaRef}>
           <ScrollArea className="h-full px-4 py-4">
             {messages.length === 0 ? (
@@ -251,20 +248,6 @@ export const GroupChat = ({
                           >
                             <span className="text-[10px]">{format(messageDate, "h:mm a")}</span>
                           </div>
-
-                          {/* Unsend Button (Only for sender) */}
-                          {isMe && (
-                            <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDelete(msg.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -275,7 +258,7 @@ export const GroupChat = ({
           </ScrollArea>
         </div>
 
-        {/* Input Area */}
+        {/* --- Input Area --- */}
         <div className="p-3 border-t bg-background shrink-0">
           <form
             onSubmit={(e) => {
