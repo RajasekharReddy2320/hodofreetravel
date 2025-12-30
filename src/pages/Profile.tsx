@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History, Shield } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History, Shield, Bell, Eye, EyeOff, Heart } from "lucide-react";
 import { SecureVault } from "@/components/SecureVault";
 import DashboardNav from "@/components/DashboardNav";
 import ProfileSidebar from "@/components/ProfileSidebar";
@@ -52,7 +52,7 @@ const Profile = () => {
     toast
   } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [editing, setEditing] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(true);
   const [likedTrips, setLikedTrips] = useState<any[]>([]);
@@ -194,7 +194,7 @@ const Profile = () => {
             title: "Welcome!",
             description: "Your profile has been created. Please complete your details."
           });
-          setEditing(true);
+          setActiveTab('settings');
         }
       }
     } else {
@@ -326,7 +326,6 @@ const Profile = () => {
       title: "Success",
       description: "Profile updated successfully"
     });
-    setEditing(false);
   };
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -481,11 +480,9 @@ const Profile = () => {
                 <div className="flex flex-col md:flex-row items-center gap-4 mb-4">
                   <h1 className="text-2xl md:text-3xl font-bold">{profile.full_name || "Traveler"}</h1>
                   {isOwnProfile ? <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
-                        {editing ? "Cancel" : "Edit Profile"}
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={handleLogout}>
-                        <LogOut className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => setActiveTab('settings')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
                       </Button>
                     </div> : <div className="flex gap-2">
                       {connectionStatus === 'none' && <Button size="sm" onClick={handleConnectionAction}>
@@ -838,71 +835,269 @@ const Profile = () => {
             {isOwnProfile && <TabsContent value="vault" className="mt-6">
               <SecureVault userId={currentUserId} />
             </TabsContent>}
+
+            {/* Liked Posts Tab */}
+            {isOwnProfile && <TabsContent value="liked" className="mt-6 space-y-6">
+              {likedTrips.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No liked posts yet</h3>
+                  <p className="text-muted-foreground text-sm">Posts you like will appear here</p>
+                  <Button className="mt-4" onClick={() => navigate("/")}>
+                    Explore Feed
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 md:gap-3">
+                  {userPosts.filter(post => userLikes.has(post.id)).length > 0 ? (
+                    userPosts.filter(post => userLikes.has(post.id)).map(post => (
+                      <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                        {post.image_url ? (
+                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                            <p className="text-xs text-center line-clamp-4">{post.content}</p>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-3 text-center py-16 bg-muted/30 rounded-2xl">
+                      <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                      <h3 className="font-semibold text-lg mb-1">No liked posts</h3>
+                      <p className="text-muted-foreground text-sm">Like posts to see them here</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>}
+
+            {/* Settings Tab */}
+            {isOwnProfile && <TabsContent value="settings" className="mt-6 space-y-6">
+              {/* Edit Profile Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Edit Profile
+                  </CardTitle>
+                  <CardDescription>Update your personal information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="full_name">Full Name</Label>
+                      <Input id="full_name" value={profile.full_name || ""} onChange={e => setProfile({
+                        ...profile,
+                        full_name: e.target.value
+                      })} />
+                    </div>
+                    <div>
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input id="phone" value={profile.phone || ""} onChange={e => setProfile({
+                        ...profile,
+                        phone: e.target.value
+                      })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea id="bio" value={profile.bio || ""} onChange={e => setProfile({
+                      ...profile,
+                      bio: e.target.value
+                    })} rows={3} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="home_location">Location</Label>
+                      <Input id="home_location" value={profile.home_location || ""} onChange={e => setProfile({
+                        ...profile,
+                        home_location: e.target.value
+                      })} />
+                    </div>
+                    <div>
+                      <Label htmlFor="country">Country</Label>
+                      <Input id="country" value={profile.country || ""} onChange={e => setProfile({
+                        ...profile,
+                        country: e.target.value
+                      })} />
+                    </div>
+                  </div>
+
+                  <Button onClick={handleSave} className="w-full">Save Changes</Button>
+                </CardContent>
+              </Card>
+
+              {/* Privacy Controls Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {profile.is_public ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                    Privacy Settings
+                  </CardTitle>
+                  <CardDescription>Control who can see your profile and content</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        {profile.is_public ? <Globe className="h-5 w-5 text-primary" /> : <Lock className="h-5 w-5 text-primary" />}
+                      </div>
+                      <div>
+                        <p className="font-medium">Public Profile</p>
+                        <p className="text-sm text-muted-foreground">
+                          {profile.is_public ? "Anyone can view your profile" : "Only followers can view your profile"}
+                        </p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={profile.is_public} 
+                      onCheckedChange={checked => setProfile({
+                        ...profile,
+                        is_public: checked
+                      })} 
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-accent/10">
+                        <MapPin className="h-5 w-5 text-accent" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Show Location</p>
+                        <p className="text-sm text-muted-foreground">Display your location on your profile</p>
+                      </div>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Notification Preferences Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="h-5 w-5" />
+                    Notification Preferences
+                  </CardTitle>
+                  <CardDescription>Manage how you receive notifications</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-500/10">
+                        <MessageCircle className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Messages</p>
+                        <p className="text-sm text-muted-foreground">Get notified for new messages</p>
+                      </div>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-pink-500/10">
+                        <Heart className="h-5 w-5 text-pink-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Likes & Comments</p>
+                        <p className="text-sm text-muted-foreground">Get notified when someone interacts with your posts</p>
+                      </div>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-500/10">
+                        <UsersIcon className="h-5 w-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">New Followers</p>
+                        <p className="text-sm text-muted-foreground">Get notified when someone follows you</p>
+                      </div>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-orange-500/10">
+                        <Ticket className="h-5 w-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Booking Updates</p>
+                        <p className="text-sm text-muted-foreground">Get notified about your travel bookings</p>
+                      </div>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Account Management Card */}
+              <Card className="border-destructive/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Account Management
+                  </CardTitle>
+                  <CardDescription>Manage your account settings</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <X className="h-4 w-4" />
+                    Delete Account
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>}
+
+            {/* Wallet Tab */}
+            {isOwnProfile && <TabsContent value="wallet" className="mt-6">
+              <Card className="bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-emerald-500" />
+                    Wallet Balance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-emerald-600 mb-4">
+                    ₹{walletBalance.toLocaleString()}
+                  </div>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Use your wallet balance for bookings and purchases
+                  </p>
+                  <Button className="bg-emerald-500 hover:bg-emerald-600">
+                    Add Money
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>}
           </Tabs>
         </div>
-
-        {/* Edit Profile Section */}
-        {isOwnProfile && editing && <div className="px-4 md:px-8 mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Edit Profile</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="full_name">Full Name</Label>
-                    <Input id="full_name" value={profile.full_name || ""} onChange={e => setProfile({
-                  ...profile,
-                  full_name: e.target.value
-                })} />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" value={profile.phone || ""} onChange={e => setProfile({
-                  ...profile,
-                  phone: e.target.value
-                })} />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea id="bio" value={profile.bio || ""} onChange={e => setProfile({
-                ...profile,
-                bio: e.target.value
-              })} rows={3} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="home_location">Location</Label>
-                    <Input id="home_location" value={profile.home_location || ""} onChange={e => setProfile({
-                  ...profile,
-                  home_location: e.target.value
-                })} />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Input id="country" value={profile.country || ""} onChange={e => setProfile({
-                  ...profile,
-                  country: e.target.value
-                })} />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4">
-                  <div className="flex items-center gap-2">
-                    <Switch checked={profile.is_public} onCheckedChange={checked => setProfile({
-                  ...profile,
-                  is_public: checked
-                })} />
-                    <Label>Public Profile</Label>
-                  </div>
-                  <Button onClick={handleSave}>Save Changes</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>}
 
         {/* Review Section */}
         {isOwnProfile && <div className="px-4 md:px-8 mt-8">
