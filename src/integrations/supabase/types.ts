@@ -176,22 +176,31 @@ export type Database = {
         Row: {
           content: string
           created_at: string | null
+          encrypted_keys: Json | null
           group_id: string
           id: string
+          is_encrypted: boolean | null
+          iv: string | null
           user_id: string
         }
         Insert: {
           content: string
           created_at?: string | null
+          encrypted_keys?: Json | null
           group_id: string
           id?: string
+          is_encrypted?: boolean | null
+          iv?: string | null
           user_id: string
         }
         Update: {
           content?: string
           created_at?: string | null
+          encrypted_keys?: Json | null
           group_id?: string
           id?: string
+          is_encrypted?: boolean | null
+          iv?: string | null
           user_id?: string
         }
         Relationships: [
@@ -229,6 +238,7 @@ export type Database = {
           read: boolean | null
           read_at: string | null
           recipient_id: string
+          sender_content: string | null
           sender_id: string
         }
         Insert: {
@@ -241,6 +251,7 @@ export type Database = {
           read?: boolean | null
           read_at?: string | null
           recipient_id: string
+          sender_content?: string | null
           sender_id: string
         }
         Update: {
@@ -253,6 +264,7 @@ export type Database = {
           read?: boolean | null
           read_at?: string | null
           recipient_id?: string
+          sender_content?: string | null
           sender_id?: string
         }
         Relationships: []

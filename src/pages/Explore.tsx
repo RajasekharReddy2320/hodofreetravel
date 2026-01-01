@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -42,8 +42,8 @@ import {
   initializeE2E, 
   encryptMessage, 
   decryptMessage, 
-  hasKeyPair,
-  getStoredKeyPair 
+  hasKeyPairSync,
+  clearE2EKeys 
 } from "@/utils/e2eEncryption";
 
 // --- Interfaces ---
@@ -84,6 +84,7 @@ interface Message {
   encrypted_key?: string | null;
   iv?: string | null;
   is_encrypted?: boolean;
+  sender_content?: string | null;
 }
 interface Conversation {
   user: Profile;
@@ -154,7 +155,8 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
@@ -193,6 +195,29 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
+  // Auto-hide sidebar on mouse move
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    const isNearLeftEdge = e.clientX <= 60;
+    if (isNearLeftEdge && !isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [handleMouseMove]);
+
+  // Close sidebar when mouse leaves and not hovered
+  useEffect(() => {
+    if (!isSidebarHovered && isSidebarOpen && activeTab === "messages") {
+      const timer = setTimeout(() => {
+        setIsSidebarOpen(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarHovered, isSidebarOpen, activeTab]);
+
   useEffect(() => {
     if (tab && VALID_TABS.includes(tab as TabType)) {
       setActiveTab(tab as TabType);
@@ -220,7 +245,7 @@ const Explore = () => {
     
     // Initialize E2E encryption
     try {
-      const publicKey = await initializeE2E();
+      const publicKey = await initializeE2E(session.user.id);
       // Store public key in profile if not already stored
       await supabase
         .from("profiles")
@@ -540,18 +565,30 @@ const Explore = () => {
     // Decrypt encrypted messages
     const decryptedMessages = await Promise.all(
       (data || []).map(async (msg) => {
+        // If message is encrypted
         if (msg.is_encrypted && msg.encrypted_key && msg.iv) {
           try {
-            // Only decrypt messages sent to us (we have the private key)
+            // For messages we sent, use the sender_content if available
+            if (msg.sender_id === currentUserId && msg.sender_content) {
+              return { ...msg, content: msg.sender_content };
+            }
+            // For messages sent to us, decrypt using our private key
             if (msg.recipient_id === currentUserId) {
-              const decryptedContent = await decryptMessage(msg.content, msg.encrypted_key, msg.iv);
+              const decryptedContent = await decryptMessage(msg.content, msg.encrypted_key, msg.iv, currentUserId);
               return { ...msg, content: decryptedContent };
             }
-            // For messages we sent, the content is already readable (we store it before encryption for sender)
+            // For old messages we sent without sender_content, show placeholder
+            if (msg.sender_id === currentUserId) {
+              return { ...msg, content: msg.content }; // Keep original - might not be encrypted correctly
+            }
             return msg;
           } catch (error) {
             console.error("Failed to decrypt message:", error);
-            return { ...msg, content: "[Encrypted message - unable to decrypt]" };
+            // If we sent it, try to display something useful
+            if (msg.sender_id === currentUserId && msg.sender_content) {
+              return { ...msg, content: msg.sender_content };
+            }
+            return { ...msg, content: "[Message encrypted]" };
           }
         }
         return msg;
@@ -590,10 +627,12 @@ const Explore = () => {
       return;
     }
 
+    const originalContent = validation.data.content;
     let messageData: any = { 
       sender_id: currentUserId, 
       recipient_id: selectedUser.id, 
-      content: validation.data.content,
+      content: originalContent,
+      sender_content: originalContent, // Always store readable copy for sender
       is_encrypted: false
     };
 
@@ -601,7 +640,7 @@ const Explore = () => {
     if (recipientPublicKey && e2eEnabled) {
       try {
         const { encryptedMessage, encryptedKey, iv } = await encryptMessage(
-          validation.data.content,
+          originalContent,
           recipientPublicKey
         );
         messageData = {
@@ -609,7 +648,8 @@ const Explore = () => {
           content: encryptedMessage,
           encrypted_key: encryptedKey,
           iv: iv,
-          is_encrypted: true
+          is_encrypted: true,
+          sender_content: originalContent // Keep original for sender to read
         };
       } catch (error) {
         console.error("Encryption failed, sending unencrypted:", error);
@@ -628,10 +668,10 @@ const Explore = () => {
       return;
     }
 
-    // Add to state with decrypted content for display
+    // Add to state with original content for display
     const displayMessage = {
       ...data,
-      content: validation.data.content // Show original content to sender
+      content: originalContent // Show original content to sender
     } as Message;
     
     setMessages((prev) => {
@@ -686,7 +726,7 @@ const Explore = () => {
 
     const messagesChannel = supabase
       .channel("messages-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async (payload) => {
         const msg = (payload.new || payload.old) as any;
 
         // Filter: Does this message involve me?
@@ -700,9 +740,23 @@ const Explore = () => {
             ((newMsg.sender_id === selectedUser.id && newMsg.recipient_id === currentUserId) ||
               (newMsg.sender_id === currentUserId && newMsg.recipient_id === selectedUser.id))
           ) {
+            // Decrypt incoming message if needed
+            let displayContent = newMsg.content;
+            if (newMsg.is_encrypted && newMsg.encrypted_key && newMsg.iv) {
+              if (newMsg.recipient_id === currentUserId) {
+                try {
+                  displayContent = await decryptMessage(newMsg.content, newMsg.encrypted_key, newMsg.iv, currentUserId);
+                } catch (e) {
+                  displayContent = "[Encrypted message]";
+                }
+              } else if (newMsg.sender_content) {
+                displayContent = newMsg.sender_content;
+              }
+            }
+            
             setMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
+              return [...prev, { ...newMsg, content: displayContent }];
             });
             if (newMsg.recipient_id === currentUserId) {
               supabase.from("messages").update({ read: true }).eq("id", newMsg.id);
@@ -748,20 +802,37 @@ const Explore = () => {
     { id: "connections" as const, label: "Connections", icon: Users },
   ];
 
+  // Check if we're in messages tab for fullscreen layout
+  const isMessagesTab = activeTab === "messages";
+  const sidebarVisible = isSidebarOpen || isSidebarHovered || !isMessagesTab;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* 1. Header (Normal Scrolling) */}
+      {/* Header */}
       <DashboardNav />
 
-      {/* 2. Flex Container */}
-      <div className="flex">
-        {/* SIDEBAR: Sticky top-0 h-screen */}
+      {/* Main Container */}
+      <div className="flex flex-1 relative">
+        {/* Edge indicator for auto-reveal */}
+        {isMessagesTab && !sidebarVisible && (
+          <div 
+            className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-1 z-50 bg-gradient-to-b from-primary/40 via-accent/30 to-primary/40 opacity-60 hover:opacity-100 transition-opacity duration-300"
+            style={{ boxShadow: '2px 0 8px rgba(var(--primary), 0.2)' }}
+          />
+        )}
+
+        {/* SIDEBAR */}
         <aside
-          className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
-            ${isSidebarOpen ? "w-60" : "w-[72px]"}
+          onMouseEnter={() => setIsSidebarHovered(true)}
+          onMouseLeave={() => setIsSidebarHovered(false)}
+          className={`
+            ${isMessagesTab ? 'fixed' : 'sticky'} top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40
+            transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+            ${sidebarVisible ? "w-60 translate-x-0 opacity-100 shadow-xl" : "w-0 -translate-x-full opacity-0"}
           `}
         >
-          <div className={`flex items-center h-16 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
+          <div className={`flex items-center h-14 px-3 mb-2 ${sidebarVisible ? "justify-between" : "justify-center"}`}>
+            {sidebarVisible && <span className="font-semibold text-lg">Explore</span>}
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -775,32 +846,27 @@ const Explore = () => {
                   key={tabItem.id}
                   onClick={() => handleTabChange(tabItem.id)}
                   className={`
-                    flex items-center transition-all duration-200 rounded-lg group relative
-                    ${isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-4 justify-center"}
+                    flex items-center transition-all duration-200 rounded-lg group relative w-full px-3 py-2.5 gap-3
                     ${activeTab === tabItem.id ? "bg-primary/10 text-primary hover:bg-primary/20" : "hover:bg-muted text-muted-foreground hover:text-foreground"}
                   `}
-                  title={!isSidebarOpen ? tabItem.label : undefined}
                 >
                   <div className="relative">
-                    <Icon className={`shrink-0 transition-all ${isSidebarOpen ? "h-5 w-5" : "h-6 w-6"}`} />
-                    {!isSidebarOpen && tabItem.id === "messages" && totalUnreadMessages > 0 && (
+                    <Icon className="h-5 w-5 shrink-0" />
+                    {tabItem.id === "messages" && totalUnreadMessages > 0 && (
                       <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-background" />
                     )}
                   </div>
-
-                  {isSidebarOpen && (
-                    <div className="flex-1 flex justify-between items-center overflow-hidden">
-                      <span className="truncate font-medium text-sm">{tabItem.label}</span>
-                      {tabItem.id === "connections" && connections.length > 0 && (
-                        <span className="text-xs text-muted-foreground ml-1">({connections.length})</span>
-                      )}
-                      {tabItem.id === "messages" && totalUnreadMessages > 0 && (
-                        <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                          {totalUnreadMessages}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex-1 flex justify-between items-center overflow-hidden">
+                    <span className="truncate font-medium text-sm">{tabItem.label}</span>
+                    {tabItem.id === "connections" && connections.length > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">({connections.length})</span>
+                    )}
+                    {tabItem.id === "messages" && totalUnreadMessages > 0 && (
+                      <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        {totalUnreadMessages}
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -808,22 +874,415 @@ const Explore = () => {
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 min-w-0 px-4 py-6">
-          <div className="mx-auto max-w-4xl">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-3xl font-bold">Tramigos</h1>
-              <CreatePostDialog onPostCreated={handlePostUpdate} />
+        <main className={`flex-1 min-w-0 ${isMessagesTab ? 'px-0' : 'px-4 py-6'}`}>
+          {!isMessagesTab && (
+            <div className="mx-auto max-w-4xl">
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-3xl font-bold">Tramigos</h1>
+                <CreatePostDialog onPostCreated={handlePostUpdate} />
+              </div>
             </div>
+          )}
 
-            {/* --- Feed Tab --- */}
-            {activeTab === "feed" && (
-              <div className="space-y-6">
-                {posts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">No posts yet. Be the first to share your travel story!</p>
+          {/* --- Feed Tab --- */}
+          {activeTab === "feed" && (
+            <div className="mx-auto max-w-4xl space-y-6">
+              {posts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No posts yet. Be the first to share your travel story!</p>
+                </div>
+              ) : (
+                posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUserId!}
+                    userLiked={userLikes.has(post.id)}
+                    userSaved={userSaves.has(post.id)}
+                    onUpdate={handlePostUpdate}
+                  />
+                ))
+              )}
+            </div>
+          )}
+
+          {/* --- Connections Tab --- */}
+          {activeTab === "connections" && (
+            <div className="mx-auto max-w-4xl space-y-6">
+              <div className="flex gap-2 border-b pb-4">
+                <Button variant="outline" size="sm" className="rounded-full">
+                  Connected ({connections.length})
+                </Button>
+                <Button variant="ghost" size="sm" className="rounded-full">
+                  Requests ({pendingReceived.length})
+                </Button>
+                <Button variant="ghost" size="sm" className="rounded-full">
+                  Sent ({pendingSent.length})
+                </Button>
+              </div>
+              {connections.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No connections yet</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {connections.map((connection) => {
+                    const otherUser =
+                      connection.requester_id === currentUserId ? connection.addressee : connection.requester;
+                    return (
+                      <Card key={connection.id}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div
+                            className="flex items-center gap-4 cursor-pointer"
+                            onClick={() => navigate(`/profile/${otherUser?.id}`)}
+                          >
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={otherUser?.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(otherUser?.full_name || null)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold hover:underline">{otherUser?.full_name || "User"}</h3>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <UserCheck className="h-3 w-3" /> Connected
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUser(otherUser || null);
+                                handleTabChange("messages");
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" /> Message
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeConnection(connection.id)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+              {pendingReceived.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="font-semibold mb-4">Pending Requests</h3>
+                  <div className="grid gap-4">
+                    {pendingReceived.map((req) => (
+                      <Card key={req.id}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4">
+                            <Avatar>
+                              <AvatarImage src={req.requester?.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(req.requester?.full_name || null)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold">{req.requester?.full_name}</h3>
+                              <p className="text-sm text-muted-foreground">Wants to connect</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => acceptConnection(req.id)}>
+                              <Check className="h-4 w-4 mr-1" /> Accept
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => rejectConnection(req.id)}>
+                              Reject
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
+                </div>
+              )}
+              {pendingSent.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="font-semibold mb-4">Sent Requests</h3>
+                  <div className="grid gap-4">
+                    {pendingSent.map((req) => (
+                      <Card key={req.id}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4">
+                            <Avatar>
+                              <AvatarImage src={req.addressee?.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(req.addressee?.full_name || null)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold">{req.addressee?.full_name}</h3>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> Pending
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => rejectConnection(req.id)}>
+                            Cancel
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* --- Messages Tab - Fullscreen --- */}
+          {activeTab === "messages" && (
+            <div className="h-[calc(100vh-4rem)] flex">
+              {/* Conversation List */}
+              <div className="w-80 border-r flex flex-col bg-background shrink-0">
+                <div className="p-4 border-b space-y-3">
+                  <h2 className="text-xl font-bold">Messages</h2>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search users..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <ScrollArea className="flex-1">
+                  {searchQuery ? (
+                    <div className="p-2">
+                      <p className="text-xs text-muted-foreground px-2 py-1">Search Results</p>
+                      {filteredUsers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setSearchQuery("");
+                            }}
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={user.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{user.full_name || "Unknown"}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-2">
+                      {conversations.length === 0 ? (
+                        <div className="text-center py-8 px-4">
+                          <MessageSquare className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground">No conversations yet</p>
+                          <p className="text-xs text-muted-foreground mt-1">Search for users to start chatting</p>
+                        </div>
+                      ) : (
+                        conversations.map((conv) => (
+                          <div
+                            key={conv.user.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${selectedUser?.id === conv.user.id ? "bg-primary/10" : "hover:bg-muted"}`}
+                            onClick={() => setSelectedUser(conv.user)}
+                          >
+                            <div className="relative">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={conv.user.avatar_url || undefined} />
+                                <AvatarFallback>{getInitials(conv.user.full_name)}</AvatarFallback>
+                              </Avatar>
+                              {conv.unreadCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                                  {conv.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium text-sm truncate">{conv.user.full_name || "Unknown"}</span>
+                                {conv.lastMessage && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {format(new Date(conv.lastMessage.created_at), "HH:mm")}
+                                  </span>
+                                )}
+                              </div>
+                              {conv.lastMessage && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {conv.lastMessage.is_encrypted ? "🔒 Encrypted message" : conv.lastMessage.content}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              {/* Chat Window - Takes remaining space */}
+              <div className="flex-1 flex flex-col bg-background">
+                {selectedUser ? (
+                  <>
+                    <div className="border-b px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm shrink-0">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          className="h-10 w-10 cursor-pointer"
+                          onClick={() => navigate(`/profile/${selectedUser.id}`)}
+                        >
+                          <AvatarImage src={selectedUser.avatar_url || undefined} />
+                          <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold">{selectedUser.full_name}</h3>
+                          <div className="flex items-center gap-1">
+                            {recipientPublicKey && e2eEnabled ? (
+                              <span className="flex items-center gap-1 text-xs text-green-600">
+                                <ShieldCheck className="h-3 w-3" />
+                                <span>End-to-end encrypted</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Online</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <Button variant="ghost" size="icon" onClick={() => setShowThemePicker(!showThemePicker)}>
+                          <Palette className="h-4 w-4" />
+                        </Button>
+                        {showThemePicker && (
+                          <div className="absolute right-0 top-10 bg-popover border rounded-lg shadow-lg p-2 z-20 flex gap-2">
+                            {MESSAGE_THEMES.map((theme) => (
+                              <button
+                                key={theme.id}
+                                onClick={() => {
+                                  setMessageTheme(theme.id);
+                                  setShowThemePicker(false);
+                                }}
+                                className={`w-6 h-6 rounded-full ${theme.primary} ring-offset-1 ${messageTheme === theme.id ? "ring-2 ring-primary" : ""}`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Messages Area */}
+                    <div className="flex-1 min-h-0 relative" ref={scrollAreaRef}>
+                      <ScrollArea className="h-full w-full px-4 py-4">
+                        {messages.map((msg, index) => {
+                          const messageDate = new Date(msg.created_at);
+                          const prevMessage = index > 0 ? messages[index - 1] : null;
+                          const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
+                          const showDateSeparator = !prevDate || messageDate.getDate() !== prevDate.getDate();
+                          const isMe = msg.sender_id === currentUserId;
+                          return (
+                            <div key={msg.id}>
+                              {showDateSeparator && (
+                                <div className="flex justify-center my-4">
+                                  <span className="bg-muted/50 text-muted-foreground text-[10px] px-2 py-1 rounded-full uppercase tracking-wide">
+                                    {getMessageDateLabel(msg.created_at)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className={`flex group mb-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                                <div
+                                  className={`relative max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMe ? `${currentTheme.primary} text-primary-foreground rounded-tr-none` : `${currentTheme.secondary} text-foreground rounded-tl-none`}`}
+                                >
+                                  <p className="break-words whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                                  <div
+                                    className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
+                                  >
+                                    {msg.is_encrypted && (
+                                      <span title="End-to-end encrypted">
+                                        <Shield className="h-3 w-3 text-green-500" />
+                                      </span>
+                                    )}
+                                    <span>{format(messageDate, "h:mm a")}</span>
+                                    {isMe && (
+                                      <span>
+                                        {msg.read ? (
+                                          <CheckCheck className="h-3 w-3" />
+                                        ) : (
+                                          <Check className="h-3 w-3" />
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isMe && (
+                                    <div className="absolute top-0 -left-8 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() => unsendMessage(msg.id)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </ScrollArea>
+                    </div>
+
+                    <div className="p-4 bg-background border-t shrink-0">
+                      <div className="flex gap-2 items-end max-w-4xl mx-auto">
+                        <Input
+                          placeholder="Type a message..."
+                          value={messageText}
+                          onChange={(e) => setMessageText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              sendMessage();
+                            }
+                          }}
+                          className="min-h-[44px] py-3 rounded-full resize-none"
+                        />
+                        <Button
+                          size="icon"
+                          className="h-11 w-11 rounded-full shrink-0"
+                          onClick={sendMessage}
+                          disabled={!messageText.trim()}
+                        >
+                          <Send className="h-5 w-5 ml-0.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 ) : (
-                  posts.map((post) => (
+                  <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+                    <MessageSquare className="h-20 w-20 mb-6 opacity-20" />
+                    <h3 className="font-semibold text-xl mb-2">Your Messages</h3>
+                    <p className="text-muted-foreground">Select a conversation to start chatting</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- Saved Tab --- */}
+          {activeTab === "saved" && (
+            <div className="mx-auto max-w-4xl space-y-6">
+              {posts.filter((p) => userSaves.has(p.id)).length === 0 ? (
+                <div className="text-center py-12">
+                  <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No saved posts yet</p>
+                </div>
+              ) : (
+                posts
+                  .filter((p) => userSaves.has(p.id))
+                  .map((post) => (
                     <PostCard
                       key={post.id}
                       post={post}
@@ -833,344 +1292,13 @@ const Explore = () => {
                       onUpdate={handlePostUpdate}
                     />
                   ))
-                )}
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {/* --- Connections Tab --- */}
-            {activeTab === "connections" && (
-              <div className="space-y-6">
-                <div className="flex gap-2 border-b pb-4">
-                  <Button variant="outline" size="sm" className="rounded-full">
-                    Connected ({connections.length})
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-full">
-                    Requests ({pendingReceived.length})
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-full">
-                    Sent ({pendingSent.length})
-                  </Button>
-                </div>
-                {connections.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No connections yet</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-4">
-                    {connections.map((connection) => {
-                      const otherUser =
-                        connection.requester_id === currentUserId ? connection.addressee : connection.requester;
-                      return (
-                        <Card key={connection.id}>
-                          <CardContent className="flex items-center justify-between p-4">
-                            <div
-                              className="flex items-center gap-4 cursor-pointer"
-                              onClick={() => navigate(`/profile/${otherUser?.id}`)}
-                            >
-                              <Avatar className="h-12 w-12">
-                                <AvatarImage src={otherUser?.avatar_url || undefined} />
-                                <AvatarFallback>{getInitials(otherUser?.full_name || null)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <h3 className="font-semibold hover:underline">{otherUser?.full_name || "User"}</h3>
-                                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                  <UserCheck className="h-3 w-3" /> Connected
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUser(otherUser || null);
-                                  setActiveTab("messages");
-                                }}
-                              >
-                                <MessageSquare className="h-4 w-4 mr-1" /> Message
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => removeConnection(connection.id)}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-                {pendingReceived.length > 0 && (
-                  <div className="mt-8">
-                    <h3 className="font-semibold mb-4">Pending Requests</h3>
-                    <div className="grid gap-4">
-                      {pendingReceived.map((req) => (
-                        <Card key={req.id}>
-                          <CardContent className="flex items-center justify-between p-4">
-                            <div className="flex items-center gap-4">
-                              <Avatar>
-                                <AvatarImage src={req.requester?.avatar_url || undefined} />
-                                <AvatarFallback>{getInitials(req.requester?.full_name || null)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <h3 className="font-semibold">{req.requester?.full_name}</h3>
-                                <p className="text-sm text-muted-foreground">Wants to connect</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => acceptConnection(req.id)}>
-                                <Check className="h-4 w-4 mr-1" /> Accept
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => rejectConnection(req.id)}>
-                                <X className="h-4 w-4 mr-1" /> Decline
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* --- Messages Tab (Fixed & Bounded) --- */}
-            {activeTab === "messages" && (
-              // FIXED HEIGHT CONTAINER for chat
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-10rem)]">
-                {/* Conversations List */}
-                <Card className="md:col-span-1 border-r-0 rounded-r-none flex flex-col h-full overflow-hidden">
-                  <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                    <CardTitle className="text-lg flex items-center justify-between">Chats</CardTitle>
-                    <div className="relative mt-2">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 h-9"
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 flex-1 min-h-0 relative">
-                    <ScrollArea className="h-full w-full">
-                      {(searchQuery ? filteredUsers : conversations.map((c) => c.user)).map((user) => {
-                        const convo = conversations.find((c) => c.user.id === user.id);
-                        return (
-                          <div
-                            key={user.id}
-                            className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-accent/50 transition-colors ${selectedUser?.id === user.id ? "bg-accent" : ""}`}
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setSearchQuery("");
-                            }}
-                          >
-                            <Avatar>
-                              <AvatarImage src={user.avatar_url || undefined} />
-                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <div className="flex justify-between items-baseline">
-                                <p className="font-medium text-sm break-words">{user.full_name || "User"}</p>
-                                {convo && convo.lastMessage && (
-                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-1">
-                                    {format(new Date(convo.lastMessage.created_at), "MMM d")}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <p className="text-xs text-muted-foreground truncate w-full">
-                                  {convo?.lastMessage ? convo.lastMessage.content : "Start a conversation"}
-                                </p>
-                                {convo && convo.unreadCount > 0 && (
-                                  <span className="bg-primary text-primary-foreground text-[10px] h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center ml-2">
-                                    {convo.unreadCount}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-
-                {/* Chat Window */}
-                <Card className="md:col-span-2 flex flex-col border-l-0 rounded-l-none h-full overflow-hidden">
-                  {selectedUser ? (
-                    <>
-                      <div className="border-b px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm shrink-0">
-                        <div className="flex items-center gap-3">
-                          <Avatar
-                            className="h-9 w-9 cursor-pointer"
-                            onClick={() => navigate(`/profile/${selectedUser.id}`)}
-                          >
-                            <AvatarImage src={selectedUser.avatar_url || undefined} />
-                            <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="font-semibold text-sm">{selectedUser.full_name}</h3>
-                            <div className="flex items-center gap-1">
-                              {recipientPublicKey && e2eEnabled ? (
-                                <span className="flex items-center gap-1 text-xs text-green-600">
-                                  <ShieldCheck className="h-3 w-3" />
-                                  <span>End-to-end encrypted</span>
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Online</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="relative">
-                          <Button variant="ghost" size="icon" onClick={() => setShowThemePicker(!showThemePicker)}>
-                            <Palette className="h-4 w-4" />
-                          </Button>
-                          {showThemePicker && (
-                            <div className="absolute right-0 top-10 bg-popover border rounded-lg shadow-lg p-2 z-20 flex gap-2">
-                              {MESSAGE_THEMES.map((theme) => (
-                                <button
-                                  key={theme.id}
-                                  onClick={() => {
-                                    setMessageTheme(theme.id);
-                                    setShowThemePicker(false);
-                                  }}
-                                  className={`w-6 h-6 rounded-full ${theme.primary} ring-offset-1 ${messageTheme === theme.id ? "ring-2 ring-primary" : ""}`}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Messages Area - Uses flex-1 and min-h-0 to force scroll inside */}
-                      <div className="flex-1 min-h-0 relative" ref={scrollAreaRef}>
-                        <ScrollArea className="h-full w-full px-4 py-4">
-                          {messages.map((msg, index) => {
-                            const messageDate = new Date(msg.created_at);
-                            const prevMessage = index > 0 ? messages[index - 1] : null;
-                            const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
-                            const showDateSeparator = !prevDate || messageDate.getDate() !== prevDate.getDate();
-                            const isMe = msg.sender_id === currentUserId;
-                            return (
-                              <div key={msg.id}>
-                                {showDateSeparator && (
-                                  <div className="flex justify-center my-4">
-                                    <span className="bg-muted/50 text-muted-foreground text-[10px] px-2 py-1 rounded-full uppercase tracking-wide">
-                                      {getMessageDateLabel(msg.created_at)}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className={`flex group mb-1 ${isMe ? "justify-end" : "justify-start"}`}>
-                                  <div
-                                    className={`relative max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMe ? `${currentTheme.primary} text-primary-foreground rounded-tr-none` : `${currentTheme.secondary} text-foreground rounded-tl-none`}`}
-                                  >
-                                    <p className="break-words whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                                    <div
-                                      className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
-                                    >
-                                      {msg.is_encrypted && (
-                                        <span title="End-to-end encrypted">
-                                          <Shield className="h-3 w-3 text-green-500" />
-                                        </span>
-                                      )}
-                                      <span>{format(messageDate, "h:mm a")}</span>
-                                      {isMe && (
-                                        <span>
-                                          {msg.read ? (
-                                            <CheckCheck className="h-3 w-3" />
-                                          ) : (
-                                            <Check className="h-3 w-3" />
-                                          )}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {isMe && (
-                                      <div className="absolute top-0 -left-8 opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                          onClick={() => unsendMessage(msg.id)}
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </ScrollArea>
-                      </div>
-
-                      <div className="p-3 bg-background border-t shrink-0">
-                        <div className="flex gap-2 items-end">
-                          <Input
-                            placeholder="Type a message..."
-                            value={messageText}
-                            onChange={(e) => setMessageText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                sendMessage();
-                              }
-                            }}
-                            className="min-h-[44px] py-3 rounded-full resize-none"
-                          />
-                          <Button
-                            size="icon"
-                            className="h-11 w-11 rounded-full shrink-0"
-                            onClick={sendMessage}
-                            disabled={!messageText.trim()}
-                          >
-                            <Send className="h-5 w-5 ml-0.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center h-full">
-                      <MessageSquare className="h-16 w-16 mb-4 opacity-20" />
-                      <h3 className="font-semibold text-lg">Your Messages</h3>
-                      <p>Select a conversation to start chatting</p>
-                    </div>
-                  )}
-                </Card>
-              </div>
-            )}
-
-            {/* --- Saved Tab --- */}
-            {activeTab === "saved" && (
-              <div className="space-y-6">
-                {posts.filter((p) => userSaves.has(p.id)).length === 0 ? (
-                  <div className="text-center py-12">
-                    <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">No saved posts yet</p>
-                  </div>
-                ) : (
-                  posts
-                    .filter((p) => userSaves.has(p.id))
-                    .map((post) => (
-                      <PostCard
-                        key={post.id}
-                        post={post}
-                        currentUserId={currentUserId!}
-                        userLiked={userLikes.has(post.id)}
-                        userSaved={userSaves.has(post.id)}
-                        onUpdate={handlePostUpdate}
-                      />
-                    ))
-                )}
-              </div>
-            )}
-
-            {/* --- Find Buddies Tab --- */}
-            {activeTab === "find-buddies" && (
+          {/* --- Find Buddies Tab --- */}
+          {activeTab === "find-buddies" && (
+            <div className="mx-auto max-w-4xl">
               <Card>
                 <CardHeader>
                   <CardTitle>Search for Travel Buddies</CardTitle>
@@ -1241,10 +1369,12 @@ const Explore = () => {
                   )}
                 </CardContent>
               </Card>
-            )}
+            </div>
+          )}
 
-            {/* --- Nearby Tab --- */}
-            {activeTab === "nearby" && (
+          {/* --- Nearby Tab --- */}
+          {activeTab === "nearby" && (
+            <div className="mx-auto max-w-4xl">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1276,10 +1406,12 @@ const Explore = () => {
                   )}
                 </CardContent>
               </Card>
-            )}
+            </div>
+          )}
 
-            {/* --- Travel With Me Tab --- */}
-            {activeTab === "travel-with-me" && (
+          {/* --- Travel With Me Tab --- */}
+          {activeTab === "travel-with-me" && (
+            <div className="mx-auto max-w-4xl">
               <Card>
                 <CardHeader>
                   <CardTitle>Post Your Travel Plans</CardTitle>
@@ -1292,43 +1424,43 @@ const Explore = () => {
                   </div>
                 </CardContent>
               </Card>
-            )}
+            </div>
+          )}
 
-            {/* --- Travel Groups Tab --- */}
-            {activeTab === "travel-groups" && (
-              <>
-                <div className="mb-6 flex justify-between items-center">
-                  <div>
-                    <h2 className="text-2xl font-bold">Travel Groups</h2>
-                    <p className="text-muted-foreground">Find travel companions for your next adventure</p>
-                  </div>
-                  <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
+          {/* --- Travel Groups Tab --- */}
+          {activeTab === "travel-groups" && (
+            <div className="mx-auto max-w-4xl">
+              <div className="mb-6 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">Travel Groups</h2>
+                  <p className="text-muted-foreground">Find travel companions for your next adventure</p>
                 </div>
-                {travelGroups.length === 0 ? (
-                  <Card>
-                    <CardContent className="pt-12 pb-12">
-                      <div className="text-center text-muted-foreground">
-                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                        <p>No travel groups yet.</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {travelGroups.map((group) => (
-                      <TravelGroupCard
-                        key={group.id}
-                        group={group}
-                        currentUserId={currentUserId!}
-                        isMember={userGroupMemberships.has(group.id)}
-                        onUpdate={handleGroupUpdate}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+                <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
+              </div>
+              {travelGroups.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-12 pb-12">
+                    <div className="text-center text-muted-foreground">
+                      <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p>No travel groups yet.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {travelGroups.map((group) => (
+                    <TravelGroupCard
+                      key={group.id}
+                      group={group}
+                      currentUserId={currentUserId!}
+                      isMember={userGroupMemberships.has(group.id)}
+                      onUpdate={handleGroupUpdate}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>
