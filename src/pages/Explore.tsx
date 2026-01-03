@@ -842,27 +842,43 @@ const Explore = () => {
 
       {/* Main Container */}
       <div className="flex flex-1 relative">
-        {/* Edge indicator for auto-reveal */}
-        {isMessagesTab && !sidebarVisible && (
+        {/* Mobile Menu Button - Fixed position */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="fixed bottom-4 left-4 z-50 md:hidden bg-primary text-primary-foreground p-3 rounded-full shadow-lg"
+        >
+          {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+
+        {/* Edge indicator for auto-reveal (desktop only) */}
+        {!sidebarVisible && (
           <div 
-            className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-1 z-50 bg-gradient-to-b from-primary/40 via-accent/30 to-primary/40 opacity-60 hover:opacity-100 transition-opacity duration-300"
+            className="hidden md:block fixed top-16 left-0 h-[calc(100vh-4rem)] w-1 z-50 bg-gradient-to-b from-primary/40 via-accent/30 to-primary/40 opacity-60 hover:opacity-100 transition-opacity duration-300"
             style={{ boxShadow: '2px 0 8px rgba(var(--primary), 0.2)' }}
           />
         )}
 
-        {/* SIDEBAR */}
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* SIDEBAR - Slide drawer on mobile, collapsible on desktop */}
         <aside
           onMouseEnter={() => setIsSidebarHovered(true)}
           onMouseLeave={() => setIsSidebarHovered(false)}
           className={`
-            ${isMessagesTab ? 'fixed' : 'sticky'} top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40
+            fixed md:sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r bg-background z-40
             transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-            ${sidebarVisible ? "w-60 translate-x-0 opacity-100 shadow-xl" : "w-0 -translate-x-full opacity-0"}
+            ${sidebarVisible ? "w-64 md:w-60 translate-x-0 opacity-100 shadow-xl" : "w-0 -translate-x-full opacity-0 md:w-0"}
           `}
         >
           <div className={`flex items-center h-14 px-3 mb-2 ${sidebarVisible ? "justify-between" : "justify-center"}`}>
             {sidebarVisible && <span className="font-semibold text-lg">Explore</span>}
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden md:flex">
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
@@ -918,11 +934,11 @@ const Explore = () => {
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className={`flex-1 min-w-0 ${isMessagesTab ? 'px-0' : 'px-4 py-6'}`}>
+        <main className={`flex-1 min-w-0 ${isMessagesTab ? 'px-0' : 'px-2 sm:px-4 py-4 md:py-6'}`}>
           {!isMessagesTab && activeTab === "feed" && (
             <div className="mx-auto max-w-4xl">
-              <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-bold">Tramigos</h1>
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h1 className="text-2xl md:text-3xl font-bold">Tramigos</h1>
               </div>
             </div>
           )}
@@ -1078,11 +1094,11 @@ const Explore = () => {
 
           {/* --- Messages Tab - Fullscreen --- */}
           {activeTab === "messages" && (
-            <div className="h-[calc(100vh-4rem)] flex">
-              {/* Conversation List */}
-              <div className="w-80 border-r flex flex-col bg-background shrink-0">
-                <div className="p-4 border-b space-y-3">
-                  <h2 className="text-xl font-bold">Messages</h2>
+            <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row">
+              {/* Conversation List - Hidden on mobile when user is selected */}
+              <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} w-full md:w-72 lg:w-80 border-r flex-col bg-background shrink-0`}>
+                <div className="p-3 md:p-4 border-b space-y-2 md:space-y-3">
+                  <h2 className="text-lg md:text-xl font-bold">Messages</h2>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1168,29 +1184,39 @@ const Explore = () => {
                 </ScrollArea>
               </div>
 
-              {/* Chat Window - Takes remaining space */}
-              <div className="flex-1 flex flex-col bg-background">
+              {/* Chat Window - Takes remaining space, full screen on mobile when user selected */}
+              <div className={`${selectedUser ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-background`}>
                 {selectedUser ? (
                   <>
-                    <div className="border-b px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm shrink-0">
-                      <div className="flex items-center gap-3">
+                    <div className="border-b px-3 md:px-4 py-2 md:py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm shrink-0">
+                      <div className="flex items-center gap-2 md:gap-3">
+                        {/* Back button on mobile */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="md:hidden shrink-0"
+                          onClick={() => setSelectedUser(null)}
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </Button>
                         <Avatar
-                          className="h-10 w-10 cursor-pointer"
+                          className="h-8 w-8 md:h-10 md:w-10 cursor-pointer"
                           onClick={() => navigate(`/profile/${selectedUser.id}`)}
                         >
                           <AvatarImage src={selectedUser.avatar_url || undefined} />
                           <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="font-semibold">{selectedUser.full_name}</h3>
+                          <h3 className="font-semibold text-sm md:text-base">{selectedUser.full_name}</h3>
                           <div className="flex items-center gap-1">
                             {recipientPublicKey && e2eEnabled ? (
-                              <span className="flex items-center gap-1 text-xs text-green-600">
+                              <span className="flex items-center gap-1 text-[10px] md:text-xs text-green-600">
                                 <ShieldCheck className="h-3 w-3" />
-                                <span>End-to-end encrypted</span>
+                                <span className="hidden sm:inline">End-to-end encrypted</span>
+                                <span className="sm:hidden">Encrypted</span>
                               </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">Online</span>
+                              <span className="text-[10px] md:text-xs text-muted-foreground">Online</span>
                             )}
                           </div>
                         </div>
@@ -1236,7 +1262,7 @@ const Explore = () => {
                               )}
                               <div className={`flex group mb-1 ${isMe ? "justify-end" : "justify-start"}`}>
                                 <div
-                                  className={`relative max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMe ? `${currentTheme.primary} text-primary-foreground rounded-tr-none` : `${currentTheme.secondary} text-foreground rounded-tl-none`}`}
+                                  className={`relative max-w-[85%] md:max-w-[70%] rounded-2xl px-3 md:px-4 py-2 text-sm shadow-sm ${isMe ? `${currentTheme.primary} text-primary-foreground rounded-tr-none` : `${currentTheme.secondary} text-foreground rounded-tl-none`}`}
                                 >
                                   <p className="break-words whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                                   <div
@@ -1278,7 +1304,7 @@ const Explore = () => {
                       </ScrollArea>
                     </div>
 
-                    <div className="p-4 bg-background border-t shrink-0">
+                    <div className="p-2 md:p-4 bg-background border-t shrink-0">
                       <div className="flex gap-2 items-end max-w-4xl mx-auto">
                         <Input
                           placeholder="Type a message..."
@@ -1290,7 +1316,7 @@ const Explore = () => {
                               sendMessage();
                             }
                           }}
-                          className="min-h-[44px] py-3 rounded-full resize-none"
+                          className="min-h-[40px] md:min-h-[44px] py-2 md:py-3 rounded-full resize-none text-sm"
                         />
                         <Button
                           size="icon"

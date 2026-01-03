@@ -63,7 +63,7 @@ const ItineraryMap: React.FC<ItineraryMapProps> = ({ steps }) => {
   };
 
   return (
-    <div className="w-full h-[450px] rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-muted relative group">
+    <div className="w-full h-[250px] sm:h-[350px] lg:h-full lg:min-h-[450px] rounded-2xl md:rounded-3xl overflow-hidden shadow-lg border border-border bg-muted relative group">
       <iframe
         width="100%"
         height="100%"
@@ -77,7 +77,7 @@ const ItineraryMap: React.FC<ItineraryMapProps> = ({ steps }) => {
       ></iframe>
 
       {/* Badge to show it's working */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md text-xs font-bold px-3 py-1 rounded-full shadow-sm text-gray-600 pointer-events-none border border-gray-200">
+      <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-white/90 backdrop-blur-md text-[10px] md:text-xs font-bold px-2 md:px-3 py-1 rounded-full shadow-sm text-gray-600 pointer-events-none border border-gray-200">
         Route Preview
       </div>
     </div>

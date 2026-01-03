@@ -4,9 +4,10 @@ import InputForm, { InputFormRef } from "@/components/planner/InputForm";
 import ItineraryCard from "@/components/planner/ItineraryCard";
 import ItineraryMap from "@/components/planner/ItineraryMap";
 import PlannerCart from "@/components/planner/PlannerCart";
+import DashboardNav from "@/components/DashboardNav";
 import { TripParams, TripResponse, ItineraryStep, CartItem, ItineraryHistoryItem } from "@/types/tripPlanner";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Sparkles, PlusCircle, Plane, ArrowLeft, History, Share2, Trash2, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Sparkles, PlusCircle, Plane, History, Share2, Trash2, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
@@ -241,35 +242,34 @@ const PlannerV2 = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft size={20} />
-            </Button>
-            <div className="flex items-center gap-2">
-              <Plane className="text-primary" size={24} />
-              <h1 className="text-xl font-bold">Trip Planner</h1>
-            </div>
+      {/* Main Navigation */}
+      <DashboardNav />
+
+      {/* Secondary Header with Planner Controls */}
+      <header className="sticky top-16 z-30 bg-background/95 backdrop-blur border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Plane className="text-primary h-5 w-5 md:h-6 md:w-6" />
+            <h1 className="text-lg md:text-xl font-bold">Trip Planner</h1>
           </div>
           <div className="flex items-center gap-2">
             {ttsSupported && (
               <Button
                 variant={readAloudEnabled ? "default" : "outline"}
                 size="sm"
+                className="hidden sm:flex"
                 onClick={() => {
                   if (isSpeaking) stop();
                   setReadAloudEnabled(!readAloudEnabled);
                 }}
               >
                 {readAloudEnabled ? <Volume2 className="h-4 w-4 mr-2" /> : <VolumeX className="h-4 w-4 mr-2" />}
-                {readAloudEnabled ? 'Read Aloud On' : 'Read Aloud Off'}
+                <span className="hidden md:inline">{readAloudEnabled ? 'Read Aloud On' : 'Read Aloud Off'}</span>
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => setShowHistory(true)}>
-              <History className="h-4 w-4 mr-2" />
-              History
+              <History className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">History</span>
             </Button>
           </div>
         </div>
@@ -334,17 +334,17 @@ const PlannerV2 = () => {
       </Dialog>
 
       <main className="pb-20">
-        <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-10">
           {/* Intro Text */}
           {!tripData && !isLoading && (
-            <div className="text-center mb-10 space-y-4 max-w-2xl mx-auto">
-              <h2 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight">
+            <div className="text-center mb-6 md:mb-10 space-y-3 md:space-y-4 max-w-2xl mx-auto px-2">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground tracking-tight">
                 Where do you want to{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/60">
                   go?
                 </span>
               </h2>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
                 Enter your details below and let our AI curate a perfect, bookable itinerary just for you.
               </p>
             </div>
@@ -377,52 +377,55 @@ const PlannerV2 = () => {
           {tripData && (
             <div className="animate-fade-in">
               {/* Trip Header */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-1.5 rounded-full text-sm font-bold mb-4">
-                  <Sparkles size={14} />
+              <div className="text-center mb-6 md:mb-8 px-2">
+                <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3 md:px-4 py-1 md:py-1.5 rounded-full text-xs md:text-sm font-bold mb-3 md:mb-4">
+                  <Sparkles size={12} className="md:w-3.5 md:h-3.5" />
                   {tripData.reason}
                 </div>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+                <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">
                   {tripData.title}
                 </h2>
-                <p className="text-muted-foreground mb-6">Here is your curated itinerary</p>
+                <p className="text-sm md:text-base text-muted-foreground mb-4 md:mb-6">Here is your curated itinerary</p>
                 
                 {/* Action Buttons */}
-                <div className="flex justify-center gap-3 flex-wrap">
+                <div className="flex justify-center gap-2 md:gap-3 flex-wrap">
                   <Button
                     onClick={handleAddAll}
                     variant="secondary"
-                    className="inline-flex items-center gap-2"
+                    size="sm"
+                    className="inline-flex items-center gap-1 md:gap-2 text-xs md:text-sm"
                   >
-                    <PlusCircle size={16} />
-                    Add All Paid Items to Cart
+                    <PlusCircle size={14} className="md:w-4 md:h-4" />
+                    <span className="hidden sm:inline">Add All Paid Items</span>
+                    <span className="sm:hidden">Add All</span>
                   </Button>
                   <Button
                     onClick={shareItinerary}
                     variant="outline"
-                    className="inline-flex items-center gap-2"
+                    size="sm"
+                    className="inline-flex items-center gap-1 md:gap-2 text-xs md:text-sm"
                   >
-                    <Share2 size={16} />
-                    Share Itinerary
+                    <Share2 size={14} className="md:w-4 md:h-4" />
+                    Share
                   </Button>
                 </div>
               </div>
 
-              {/* Map on Left, Itinerary on Right Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Map Section - Left Side */}
-                <div className="lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)]">
+              {/* Map on Left, Itinerary on Right Layout - Stacks on mobile */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
+                {/* Map Section - Left Side on desktop, top on mobile */}
+                <div className="lg:sticky lg:top-32 lg:h-[calc(100vh-10rem)] order-2 lg:order-1">
                   <ItineraryMap steps={tripData.steps} />
                 </div>
 
-                {/* Itinerary Section - Right Side */}
-                <div className="space-y-6">
+                {/* Itinerary Section - Right Side on desktop, bottom on mobile */}
+                <div className="space-y-4 md:space-y-6 order-1 lg:order-2">
                   {/* Timeline Connector Line (Visual) */}
                   <div className="relative">
                     <div className="absolute left-4 top-0 bottom-0 w-px bg-border hidden md:block -z-10"></div>
                     
                     {/* Steps */}
-                    <div className="space-y-6 relative z-10">
+                    <div className="space-y-4 md:space-y-6 relative z-10">
                       {tripData.steps.map((step) => (
                         <ItineraryCard
                           key={step.id}
@@ -435,8 +438,8 @@ const PlannerV2 = () => {
                   </div>
 
                   {/* Completion Message */}
-                  <div className="text-center mt-8 pb-10">
-                    <p className="text-muted-foreground text-sm">End of Itinerary</p>
+                  <div className="text-center mt-6 md:mt-8 pb-6 md:pb-10">
+                    <p className="text-muted-foreground text-xs md:text-sm">End of Itinerary</p>
                     <div className="w-2 h-2 bg-muted-foreground/50 rounded-full mx-auto mt-2"></div>
                   </div>
                 </div>
