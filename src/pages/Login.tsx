@@ -181,7 +181,7 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-          <CardDescription>Sign in to continue your journey with Travexa</CardDescription>
+          <CardDescription>Sign in to continue your journey with TraviLink</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button

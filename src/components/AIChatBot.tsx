@@ -33,7 +33,7 @@ const AIChatBot = () => {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm your TraveXa assistant. Try:\n• 'Plan a trip to Jaipur for 2 days'\n• 'Show my bookings'\n• 'Check PNR 1234567890'\n• 'Find travel buddies to Goa'\n• 'Book a train'",
+      content: "Hi! I'm your TraviLink assistant. Try:\n• 'Plan a trip to Jaipur for 2 days'\n• 'Show my bookings'\n• 'Check PNR 1234567890'\n• 'Find travel buddies to Goa'\n• 'Book a train'",
     },
   ]);
   const [input, setInput] = useState('');
@@ -310,7 +310,7 @@ const AIChatBot = () => {
           <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bot size={20} />
-              <span className="font-semibold">TraveXa Assistant</span>
+              <span className="font-semibold">TraviLink Assistant</span>
             </div>
             <div className="flex items-center gap-2">
               {ttsSupported && (

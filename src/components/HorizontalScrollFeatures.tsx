@@ -170,7 +170,7 @@ const HorizontalScrollFeatures = () => {
   const progressPercent = (progress / maxProgress) * 100;
 
   return (
-    <section id="features" ref={containerRef as any} className="relative h-screen -mb-px" aria-label="Travexa features">
+    <section id="features" ref={containerRef as any} className="relative h-screen -mb-px" aria-label="TraviLink features">
       {/* --- UNIFIED NAVIGATION DOCK --- 
         Combines Progress Bar + Navigation Buttons + Motion Toggle
       */}

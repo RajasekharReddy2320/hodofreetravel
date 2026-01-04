@@ -10,7 +10,7 @@ const Navbar = () => {
           <Link to="/" className="flex items-center gap-2 group">
             <Plane className="h-6 w-6 text-accent transition-transform group-hover:rotate-12" />
             <span className="text-2xl font-bold tracking-tight">
-              Trave<span className="text-accent">X</span>a
+              Travi<span className="text-accent">Link</span>
             </span>
           </Link>
 

@@ -209,7 +209,7 @@ const Signup = () => {
               <Plane className="h-8 w-8 text-accent" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Join Travexa</CardTitle>
+          <CardTitle className="text-2xl font-bold">Join TraviLink</CardTitle>
           <CardDescription>Create your account to start exploring the world</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1080,7 +1080,7 @@ const Profile = () => {
                   Share Your Experience
                 </CardTitle>
                 <CardDescription>
-                  Help us improve Travexa with your feedback
+                  Help us improve TraviLink with your feedback
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

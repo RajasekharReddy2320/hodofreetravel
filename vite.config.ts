@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
-        name: "Travexa - AI-Powered Travel Planning",
-        short_name: "Travexa",
+        name: "TraviLink - AI-Powered Travel Planning",
+        short_name: "TraviLink",
         description: "Discover your next adventure with AI-powered trip planning, social connections, and seamless booking.",
         theme_color: "#0f172a",
         background_color: "#0f172a",

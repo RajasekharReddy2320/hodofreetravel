@@ -134,7 +134,7 @@ const Index = () => {
               <Plane className="h-6 w-6 text-primary transition-transform group-hover:rotate-12" />
             </div>
             <h1 className="text-xl font-bold tracking-tight">
-              Trave<span className="text-accent">X</span>a
+              Travi<span className="text-accent">Link</span>
             </h1>
           </Link>
           <div className="flex gap-3">
@@ -168,7 +168,7 @@ const Index = () => {
               className="mb-6 px-4 py-2 text-sm bg-background/60 backdrop-blur-xl border border-border/50 shadow-lg"
             >
               <Sparkles className="h-4 w-4 mr-2 text-accent" />
-              Welcome to Travexa
+              Welcome to TraviLink
             </Badge>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight">
               Your{" "}
@@ -216,7 +216,7 @@ const Index = () => {
             <Badge variant="secondary" className="mb-4 bg-background/60 backdrop-blur-xl border border-border/50">
               Features
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose Travexa?</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose TraviLink?</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               Your all-in-one travel companion that revolutionizes how you plan, book, and experience your journeys
             </p>
@@ -265,12 +265,12 @@ const Index = () => {
               </Badge>
               <CardTitle className="text-3xl md:text-4xl mb-4">We'd Love Your Feedback!</CardTitle>
               <CardDescription className="text-base">
-                Travexa is currently in development. We're building a fully functional travel planning and booking
+                TraviLink is currently in development. We're building a fully functional travel planning and booking
                 platform.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6 relative z-10">
-              <p className="text-xl font-medium text-foreground">Would you use Travexa if it were fully functional?</p>
+              <p className="text-xl font-medium text-foreground">Would you use TraviLink if it were fully functional?</p>
               <p className="text-muted-foreground max-w-lg mx-auto">
                 Your feedback helps us understand what travelers need most. We're working hard to bring you the best
                 experience.
@@ -293,7 +293,7 @@ const Index = () => {
         <div className="container mx-auto px-6 py-8 max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <div className="text-center md:text-left">
-              <p>© {new Date().getFullYear()} Travexa. All rights reserved.</p>
+              <p>© {new Date().getFullYear()} TraviLink. All rights reserved.</p>
               <p className="text-xs mt-1">Made with ❤️ by Rajasekhar</p>
             </div>
             <div className="flex gap-6">

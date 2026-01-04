@@ -10,7 +10,7 @@ const Footer = () => {
           <div>
             <Link to="/" className="flex items-center gap-2 mb-4 group">
               <Plane className="h-6 w-6 text-accent transition-transform group-hover:rotate-12" />
-              <span className="text-xl font-bold">Trave<span className="text-accent">X</span>a</span>
+              <span className="text-xl font-bold">Travi<span className="text-accent">Link</span></span>
             </Link>
             <p className="text-primary-foreground/80 text-sm">
               Your AI-powered travel companion for unforgettable adventures around the world.
@@ -83,8 +83,8 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-primary-foreground/20 pt-8 text-center text-sm text-primary-foreground/60">
-          <p>&copy; {new Date().getFullYear()} Travexa. All rights reserved.</p>
-          <p className="mt-2 text-xs">Made with ❤️ by Team TraveXa</p>
+          <p>&copy; {new Date().getFullYear()} TraviLink. All rights reserved.</p>
+          <p className="mt-2 text-xs">Made with ❤️ by Team TraviLink</p>
         </div>
       </div>
     </footer>

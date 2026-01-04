@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useJourneyReminders, useMessageNotifications } from '@/hooks/useNotifications';
+import { useJourneyReminders, useMessageNotifications, useBookingNotifications } from '@/hooks/useNotifications';
 
 export function NotificationInitializer() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -25,6 +25,9 @@ export function NotificationInitializer() {
 
   // Initialize message notifications for logged-in users
   useMessageNotifications(userId);
+
+  // Initialize booking update notifications for logged-in users
+  useBookingNotifications(userId);
 
   return null;
 }
