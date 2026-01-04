@@ -94,7 +94,7 @@ const Onboarding = () => {
       if (error) throw error;
 
       toast({
-        title: 'Welcome to Travexa!',
+        title: 'Welcome to TraviLink!',
         description: 'Your preferences have been saved',
       });
 

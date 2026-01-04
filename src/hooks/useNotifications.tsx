@@ -127,7 +127,10 @@ export function useMessageNotifications(currentUserId: string | null) {
             profile?.full_name || 'Someone',
             newMessage.content,
             true,
-            group?.title || 'a group'
+            group?.title || 'a group',
+            () => {
+              window.location.href = `/explore?tab=messages`;
+            }
           );
         }
       )
@@ -157,7 +160,11 @@ export function useMessageNotifications(currentUserId: string | null) {
           notificationService.sendMessageNotification(
             profile?.full_name || 'Someone',
             newMessage.content,
-            false
+            false,
+            undefined,
+            () => {
+              window.location.href = `/explore?tab=messages`;
+            }
           );
         }
       )
@@ -166,6 +173,95 @@ export function useMessageNotifications(currentUserId: string | null) {
     return () => {
       supabase.removeChannel(groupChannel);
       supabase.removeChannel(dmChannel);
+    };
+  }, [currentUserId]);
+}
+
+// Hook for real-time booking update notifications
+export function useBookingNotifications(currentUserId: string | null) {
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const bookingChannel = supabase
+      .channel('booking-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bookings',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        async (payload) => {
+          const updatedBooking = payload.new as any;
+          const oldBooking = payload.old as any;
+
+          // Notify on status change
+          if (updatedBooking.status !== oldBooking.status) {
+            notificationService.sendBookingUpdate(
+              updatedBooking.booking_reference,
+              updatedBooking.status,
+              updatedBooking.service_name,
+              () => {
+                window.location.href = `/ticket/${updatedBooking.id}`;
+              }
+            );
+          }
+
+          // Notify on payment status change
+          if (updatedBooking.payment_status !== oldBooking.payment_status) {
+            const statusMap: Record<string, 'success' | 'failed' | 'pending'> = {
+              'paid': 'success',
+              'failed': 'failed',
+              'pending': 'pending',
+            };
+            
+            notificationService.sendPaymentNotification(
+              updatedBooking.price_inr,
+              statusMap[updatedBooking.payment_status] || 'pending',
+              updatedBooking.booking_reference,
+              () => {
+                window.location.href = `/ticket/${updatedBooking.id}`;
+              }
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new bookings
+    const newBookingChannel = supabase
+      .channel('new-booking-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bookings',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        async (payload) => {
+          const newBooking = payload.new as any;
+
+          if (newBooking.status === 'confirmed') {
+            notificationService.sendBookingConfirmation(
+              newBooking.booking_reference,
+              newBooking.service_name,
+              newBooking.departure_date,
+              newBooking.from_location,
+              newBooking.to_location,
+              () => {
+                window.location.href = `/ticket/${newBooking.id}`;
+              }
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(bookingChannel);
+      supabase.removeChannel(newBookingChannel);
     };
   }, [currentUserId]);
 }

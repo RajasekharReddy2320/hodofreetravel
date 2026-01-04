@@ -49,7 +49,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="flex items-center gap-2 px-2 text-lg font-bold">
             <Plane className="h-5 w-5 text-accent" />
             {!collapsed && (
-              <span>Trave<span className="text-accent">X</span>a</span>
+              <span>Travi<span className="text-accent">Link</span></span>
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>

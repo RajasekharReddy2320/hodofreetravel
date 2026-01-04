@@ -41,7 +41,7 @@ export function NotificationPermissionBanner() {
           <div className="flex-1">
             <h4 className="font-semibold text-sm">Enable Notifications</h4>
             <p className="text-xs opacity-90 mt-1">
-              Get reminders 1 hour before your journey and instant message alerts
+              Get reminders before your journey and instant booking & message alerts
             </p>
             <div className="flex gap-2 mt-3">
               <Button

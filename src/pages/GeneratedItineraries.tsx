@@ -156,7 +156,7 @@ export default function GeneratedItineraries() {
 
   const shareViaWhatsApp = () => {
     if (!selectedItinerary) return;
-    const text = `Check out my ${selectedItinerary.title} trip to ${destination}! 🌍\n\nActivities:\n${selectedItinerary.steps?.slice(0, 5).map(s => `• ${s.title}`).join('\n')}\n\nEstimated Cost: ₹${(selectedItinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}\n\nPlanned with Travexa`;
+    const text = `Check out my ${selectedItinerary.title} trip to ${destination}! 🌍\n\nActivities:\n${selectedItinerary.steps?.slice(0, 5).map(s => `• ${s.title}`).join('\n')}\n\nEstimated Cost: ₹${(selectedItinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}\n\nPlanned with TraviLink`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -164,7 +164,7 @@ export default function GeneratedItineraries() {
   const shareViaEmail = () => {
     if (!selectedItinerary) return;
     const subject = `My Trip to ${destination} - ${selectedItinerary.title}`;
-    const body = `Hi!\n\nI've planned an amazing trip using Travexa and wanted to share it with you.\n\nTrip: ${selectedItinerary.title}\nDestination: ${destination}\nEstimated Cost: ₹${(selectedItinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}\n\nActivities:\n${selectedItinerary.steps?.map((s, i) => `${i + 1}. ${s.title} - ${s.location}`).join('\n')}\n\nCheers!`;
+    const body = `Hi!\n\nI've planned an amazing trip using TraviLink and wanted to share it with you.\n\nTrip: ${selectedItinerary.title}\nDestination: ${destination}\nEstimated Cost: ₹${(selectedItinerary.estimatedTotalCost || 0).toLocaleString('en-IN')}\n\nActivities:\n${selectedItinerary.steps?.map((s, i) => `${i + 1}. ${s.title} - ${s.location}`).join('\n')}\n\nCheers!`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(url, '_blank');
   };

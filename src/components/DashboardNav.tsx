@@ -61,7 +61,7 @@ const DashboardNav = () => {
             <Plane className="h-5 w-5 text-primary-foreground transition-transform group-hover:rotate-12" />
           </div>
           <span className="hidden sm:inline-block">
-            Trave<span className="text-accent">X</span>a
+            Travi<span className="text-accent">Link</span>
           </span>
         </Link>
 

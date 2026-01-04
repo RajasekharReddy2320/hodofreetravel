@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { SharePostDialog } from '@/components/SharePostDialog';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 
-const HISTORY_KEY = 'travexa_itinerary_history';
+const HISTORY_KEY = 'travilink_itinerary_history';
 
 const PlannerV2 = () => {
   const navigate = useNavigate();
@@ -222,7 +222,7 @@ const PlannerV2 = () => {
   const shareItinerary = async () => {
     if (!tripData) return;
     
-    const shareText = `Check out my ${tripData.title} itinerary on TraveXa!\n\n${tripData.steps.map(s => `• ${s.title}`).join('\n')}`;
+    const shareText = `Check out my ${tripData.title} itinerary on TraviLink!\n\n${tripData.steps.map(s => `• ${s.title}`).join('\n')}`;
     
     if (navigator.share) {
       try {

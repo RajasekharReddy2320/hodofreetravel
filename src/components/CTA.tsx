@@ -17,7 +17,7 @@ const CTA = () => {
             Ready to Start Your Adventure?
           </h2>
           <p className="text-xl text-white/90 mb-8">
-            Join thousands of travelers who've discovered their dream destinations with Travexa
+            Join thousands of travelers who've discovered their dream destinations with TraviLink
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild className="text-lg group">
