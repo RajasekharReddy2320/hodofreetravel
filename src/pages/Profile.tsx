@@ -589,30 +589,7 @@ const Profile = () => {
         {/* Content Tabs */}
         <div className="px-4 md:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* Mobile-only TabsList - Hidden on desktop as sidebar handles navigation */}
-            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-7' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1 md:hidden`}>
-              <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Grid3X3 className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="trips" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Globe className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="groups" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <UsersIcon className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="bookings" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Ticket className="h-4 w-4" />
-              </TabsTrigger>
-              {isOwnProfile && <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <History className="h-4 w-4" />
-                </TabsTrigger>}
-              {isOwnProfile && <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Bookmark className="h-4 w-4" />
-                </TabsTrigger>}
-              {isOwnProfile && <TabsTrigger value="vault" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Shield className="h-4 w-4" />
-                </TabsTrigger>}
-            </TabsList>
+            {/* TabsList removed - navigation is handled by ProfileSidebar on both mobile and desktop */}
 
             <TabsContent value="posts" className="mt-6">
               {userPosts.length === 0 ? <div className="text-center py-16 bg-muted/30 rounded-2xl">
