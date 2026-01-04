@@ -237,15 +237,19 @@ const Explore = () => {
     };
   }, [handleScroll, handleMouseMove]);
 
-  // Close sidebar when mouse leaves and not hovered
+  // On messages tab, start with sidebar closed on mobile to maximize chat space
   useEffect(() => {
-    if (!isSidebarHovered && isSidebarOpen && activeTab === "messages") {
+    if (activeTab === "messages") {
+      // Don't auto-hide on messages - let user control it
+      return;
+    }
+    if (!isSidebarHovered && isSidebarOpen && isScrollingDown) {
       const timer = setTimeout(() => {
         setIsSidebarOpen(false);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isSidebarHovered, isSidebarOpen, activeTab]);
+  }, [isSidebarHovered, isSidebarOpen, isScrollingDown, activeTab]);
 
   useEffect(() => {
     if (tab && VALID_TABS.includes(tab as TabType)) {

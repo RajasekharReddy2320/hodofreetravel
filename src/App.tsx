@@ -8,6 +8,8 @@ import { ReducedMotionProvider } from "@/contexts/ReducedMotionContext";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { NotificationInitializer } from "@/components/NotificationInitializer";
 import AIChatBot from "@/components/AIChatBot";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import MobileBackButton from "@/components/MobileBackButton";
 import Welcome from "./pages/Welcome";
 import Explore from "./pages/Explore";
 import Login from "./pages/Login";
@@ -53,6 +55,8 @@ const App = () => (
           <NotificationInitializer />
           <BrowserRouter>
             <AIChatBot />
+            <MobileBackButton />
+            <MobileBottomNav />
             <Routes>
               <Route path="/" element={<Explore />} />
               <Route path="/explore/:tab?" element={<Explore />} />

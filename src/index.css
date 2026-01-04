@@ -109,6 +109,22 @@ Bluish-Grey, White, Black palette
     @apply bg-background text-foreground;
   }
 
+  /* Safe area insets for PWA */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Mobile bottom nav spacing */
+  @media (max-width: 768px) {
+    main, .main-content {
+      padding-bottom: 5rem !important;
+    }
+  }
+
   /* Reduce motion accessibility */
   .reduce-motion,
   .reduce-motion * {
