@@ -290,11 +290,12 @@ const AIChatBot = () => {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Button - positioned above bottom nav on mobile */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300",
+          "fixed right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300",
+          "bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-6",
           isOpen 
             ? "bg-muted text-muted-foreground rotate-90" 
             : "bg-primary text-primary-foreground hover:scale-110"
@@ -303,9 +304,12 @@ const AIChatBot = () => {
         {isOpen ? <X size={24} /> : <Bot size={24} />}
       </button>
 
-      {/* Chat Window */}
+      {/* Chat Window - positioned above bottom nav on mobile */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[360px] max-w-[calc(100vw-3rem)] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in">
+        <div className={cn(
+          "fixed right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in",
+          "bottom-[calc(10rem+env(safe-area-inset-bottom,0px))] md:bottom-24"
+        )}>
           {/* Header */}
           <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">

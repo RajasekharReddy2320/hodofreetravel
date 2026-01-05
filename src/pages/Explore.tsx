@@ -198,9 +198,15 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
-  // Auto-open sidebar only when at the very top of the page
+  // Auto-open sidebar at top, auto-close when scrolling down
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
+    const scrollingDown = currentScrollY > lastScrollY && currentScrollY > 50;
+    
+    // Auto-close sidebar when scrolling down
+    if (scrollingDown && isSidebarOpen && !isSidebarHovered) {
+      setIsSidebarOpen(false);
+    }
     
     // Only auto-open sidebar when user is at the very top (scrollY < 10)
     if (currentScrollY < 10 && !isSidebarOpen) {
@@ -208,8 +214,8 @@ const Explore = () => {
     }
     
     setLastScrollY(currentScrollY);
-    setIsScrollingDown(currentScrollY > lastScrollY);
-  }, [lastScrollY, isSidebarOpen]);
+    setIsScrollingDown(scrollingDown);
+  }, [lastScrollY, isSidebarOpen, isSidebarHovered]);
 
   // Desktop: Mouse near left edge reveals sidebar
   const handleMouseMove = useCallback((e: MouseEvent) => {
