@@ -7,6 +7,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { ReducedMotionProvider } from "@/contexts/ReducedMotionContext";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { NotificationInitializer } from "@/components/NotificationInitializer";
+import { ThemeProvider } from "next-themes";
 import AIChatBot from "@/components/AIChatBot";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import MobileBackButton from "@/components/MobileBackButton";
@@ -46,55 +47,57 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ReducedMotionProvider>
-      <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <NotificationPermissionBanner />
-          <NotificationInitializer />
-          <BrowserRouter>
-            <AIChatBot />
-            <MobileBackButton />
-            <MobileBottomNav />
-            <Routes>
-              <Route path="/" element={<Explore />} />
-              <Route path="/explore/:tab?" element={<Explore />} />
-              <Route path="/welcome" element={<Welcome />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/plan-trip" element={<PlannerV2 />} />
-              <Route path="/planner" element={<PlannerV2 />} />
-              <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
-              <Route path="/create-trip" element={<CreateTrip />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/:userId" element={<UserProfile />} />
-              <Route path="/search" element={<SearchUsers />} />
-              <Route path="/book-transport" element={<BookingHub />} />
-              <Route path="/book-transport/:section?" element={<BookingHub />} />
-              <Route path="/book-confirm" element={<BookConfirm />} />
-              <Route path="/my-tickets" element={<MyTickets />} />
-              <Route path="/ticket-details" element={<TicketDetails />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/create-post" element={<CreatePost />} />
-              
-              <Route path="/book" element={<Book />} />
-              <Route path="/travel-agents" element={<TravelAgents />} />
-              <Route path="/local-guides" element={<LocalGuides />} />
-              <Route path="/photo-vault" element={<PhotoVault />} />
-              <Route path="/knowledge" element={<Knowledge />} />
-              <Route path="/trains/pnr-enquiry" element={<PNREnquiry />} />
-              <Route path="/trains/file-tdr" element={<FileTDR />} />
-              <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
-              <Route path="/trains/schedule" element={<TrainSchedule />} />
-              <Route path="/trains/track-train" element={<TrackTrain />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </CartProvider>
-    </ReducedMotionProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <ReducedMotionProvider>
+        <CartProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <NotificationPermissionBanner />
+            <NotificationInitializer />
+            <BrowserRouter>
+              <AIChatBot />
+              <MobileBackButton />
+              <MobileBottomNav />
+              <Routes>
+                <Route path="/" element={<Explore />} />
+                <Route path="/explore/:tab?" element={<Explore />} />
+                <Route path="/welcome" element={<Welcome />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/plan-trip" element={<PlannerV2 />} />
+                <Route path="/planner" element={<PlannerV2 />} />
+                <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
+                <Route path="/create-trip" element={<CreateTrip />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/:userId" element={<UserProfile />} />
+                <Route path="/search" element={<SearchUsers />} />
+                <Route path="/book-transport" element={<BookingHub />} />
+                <Route path="/book-transport/:section?" element={<BookingHub />} />
+                <Route path="/book-confirm" element={<BookConfirm />} />
+                <Route path="/my-tickets" element={<MyTickets />} />
+                <Route path="/ticket-details" element={<TicketDetails />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/create-post" element={<CreatePost />} />
+                
+                <Route path="/book" element={<Book />} />
+                <Route path="/travel-agents" element={<TravelAgents />} />
+                <Route path="/local-guides" element={<LocalGuides />} />
+                <Route path="/photo-vault" element={<PhotoVault />} />
+                <Route path="/knowledge" element={<Knowledge />} />
+                <Route path="/trains/pnr-enquiry" element={<PNREnquiry />} />
+                <Route path="/trains/file-tdr" element={<FileTDR />} />
+                <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
+                <Route path="/trains/schedule" element={<TrainSchedule />} />
+                <Route path="/trains/track-train" element={<TrackTrain />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </CartProvider>
+      </ReducedMotionProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback } from "react";
 import { useCart } from "@/contexts/CartContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const DashboardNav = () => {
   const location = useLocation();
@@ -145,8 +146,9 @@ const DashboardNav = () => {
           </div>
         )}
 
-        {/* Toggle Button - always at far right */}
-        <div className="ml-auto shrink-0">
+        {/* Theme Toggle & Menu */}
+        <div className="ml-auto shrink-0 flex items-center gap-1">
+          <ThemeToggle />
           <Button
             variant="ghost"
             size="icon"

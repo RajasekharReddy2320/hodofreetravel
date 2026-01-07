@@ -1096,7 +1096,18 @@ const Explore = () => {
               {/* Conversation List - Hidden on mobile when user is selected */}
               <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} w-full md:w-72 lg:w-80 border-r flex-col bg-background shrink-0`}>
                 <div className="p-3 md:p-4 border-b space-y-2 md:space-y-3">
-                  <h2 className="text-lg md:text-xl font-bold">Messages</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg md:text-xl font-bold">Messages</h2>
+                    <Badge variant="secondary" className="text-xs">
+                      {conversations.length} chats
+                    </Badge>
+                  </div>
+                  {e2eEnabled && (
+                    <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-500/10 px-2 py-1.5 rounded-lg">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>End-to-end encrypted</span>
+                    </div>
+                  )}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1266,11 +1277,6 @@ const Explore = () => {
                                   <div
                                     className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
                                   >
-                                    {msg.is_encrypted && (
-                                      <span title="End-to-end encrypted">
-                                        <Shield className="h-3 w-3 text-green-500" />
-                                      </span>
-                                    )}
                                     <span>{format(messageDate, "h:mm a")}</span>
                                     {isMe && (
                                       <span>
