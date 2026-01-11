@@ -308,8 +308,6 @@ export default function GeneratedItineraries() {
                   <ItineraryCard
                     key={step.id}
                     step={step}
-                    onAdd={handleAddToCart}
-                    isAdded={cartItems.some(item => item.id === step.id)}
                   />
                 ))}
               </div>
