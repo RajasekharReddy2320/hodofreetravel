@@ -1,38 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import InputForm, { InputFormRef } from "@/components/planner/InputForm";
 import ItineraryCard from "@/components/planner/ItineraryCard";
 import ItineraryMap from "@/components/planner/ItineraryMap";
-import PlannerCart from "@/components/planner/PlannerCart";
 import DashboardNav from "@/components/DashboardNav";
-import { TripParams, TripResponse, ItineraryStep, CartItem, ItineraryHistoryItem } from "@/types/tripPlanner";
+import { TripParams, TripResponse, ItineraryStep, ItineraryHistoryItem } from "@/types/tripPlanner";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Sparkles, PlusCircle, Plane, History, Share2, Trash2, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Sparkles, Plane, History, Share2, Trash2, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useCart } from '@/contexts/CartContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { SharePostDialog } from '@/components/SharePostDialog';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 
 const HISTORY_KEY = 'travilink_itinerary_history';
 
 const PlannerV2 = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { addToCart: addToGlobalCart } = useCart();
   const [tripData, setTripData] = useState<TripResponse | null>(null);
   const [tripDestination, setTripDestination] = useState<string>('');
   const [currentLocation, setCurrentLocation] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ItineraryHistoryItem[]>([]);
-  const [showShareDialog, setShowShareDialog] = useState(false);
   const [readAloudEnabled, setReadAloudEnabled] = useState(false);
   const { toast } = useToast();
   const inputFormRef = useRef<InputFormRef>(null);
@@ -114,29 +106,6 @@ const PlannerV2 = () => {
     toast({ title: "Loaded from history", description: item.response.title });
   };
 
-  const handleProceedToCheckout = () => {
-    // Add all planner cart items to global cart
-    cartItems.forEach(item => {
-      addToGlobalCart({
-        id: item.id,
-        booking_type: item.category === 'transport' ? 'flight' : 'bus',
-        service_name: item.title,
-        service_number: `PLN-${item.id.slice(0, 6).toUpperCase()}`,
-        from_location: currentLocation || 'Origin',
-        to_location: item.location,
-        departure_date: new Date().toISOString().split('T')[0],
-        departure_time: item.time,
-        arrival_time: item.time,
-        duration: item.duration || '1h',
-        price_inr: item.estimatedCost || 0,
-        passenger_name: '',
-        passenger_email: '',
-        passenger_phone: '',
-      });
-    });
-    navigate('/cart');
-  };
-
   const handlePlanTrip = async (params: TripParams) => {
     setIsLoading(true);
     setError(null);
@@ -186,37 +155,6 @@ const PlannerV2 = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleAddToCart = (step: ItineraryStep) => {
-    if (!cartItems.some(item => item.id === step.id)) {
-      setCartItems(prev => [...prev, { ...step, addedAt: Date.now() }]);
-      setIsCartOpen(true);
-      toast({
-        title: "Added to Cart",
-        description: step.title,
-      });
-    }
-  };
-
-  const handleAddAll = () => {
-    if (!tripData) return;
-    // Add all items that have an estimated cost
-    const newItems = tripData.steps
-      .filter(step => step.estimatedCost && step.estimatedCost > 0 && !cartItems.some(item => item.id === step.id))
-      .map(step => ({ ...step, addedAt: Date.now() }));
-    if (newItems.length > 0) {
-      setCartItems(prev => [...prev, ...newItems]);
-      setIsCartOpen(true);
-      toast({
-        title: "Added All Paid Items",
-        description: `${newItems.length} items added to cart`,
-      });
-    }
-  };
-
-  const handleRemoveFromCart = (id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
   const shareItinerary = async () => {
@@ -345,7 +283,7 @@ const PlannerV2 = () => {
                 </span>
               </h2>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
-                Enter your details below and let our AI curate a perfect, bookable itinerary just for you.
+                Enter your details below and let our AI curate a perfect itinerary just for you.
               </p>
             </div>
           )}
@@ -390,16 +328,6 @@ const PlannerV2 = () => {
                 {/* Action Buttons */}
                 <div className="flex justify-center gap-2 md:gap-3 flex-wrap">
                   <Button
-                    onClick={handleAddAll}
-                    variant="secondary"
-                    size="sm"
-                    className="inline-flex items-center gap-1 md:gap-2 text-xs md:text-sm"
-                  >
-                    <PlusCircle size={14} className="md:w-4 md:h-4" />
-                    <span className="hidden sm:inline">Add All Paid Items</span>
-                    <span className="sm:hidden">Add All</span>
-                  </Button>
-                  <Button
                     onClick={shareItinerary}
                     variant="outline"
                     size="sm"
@@ -430,8 +358,6 @@ const PlannerV2 = () => {
                         <ItineraryCard
                           key={step.id}
                           step={step}
-                          onAdd={handleAddToCart}
-                          isAdded={cartItems.some(item => item.id === step.id)}
                         />
                       ))}
                     </div>
@@ -448,15 +374,6 @@ const PlannerV2 = () => {
           )}
         </div>
       </main>
-
-      {/* Cart Component */}
-      <PlannerCart
-        items={cartItems}
-        onRemove={handleRemoveFromCart}
-        isOpen={isCartOpen}
-        setIsOpen={setIsCartOpen}
-        currentLocation={currentLocation}
-      />
     </div>
   );
 };
