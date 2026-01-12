@@ -1,10 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Search, User, Plane, Compass, Ticket, ShoppingCart, Menu, X } from "lucide-react";
+import { Search, User, Plane, Compass, Ticket, Menu, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback } from "react";
-import { useCart } from "@/contexts/CartContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const DashboardNav = () => {
@@ -14,7 +12,6 @@ const DashboardNav = () => {
   const [isNavExpanded, setIsNavExpanded] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const { itemCount } = useCart();
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
@@ -117,19 +114,6 @@ const DashboardNav = () => {
             >
               <Ticket className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0" />
               <span className="hidden lg:inline-block">Book Tickets</span>
-            </Link>
-
-            <Link
-              to="/cart"
-              className="relative flex items-center gap-1 px-1.5 lg:px-2 py-2 rounded-md transition-colors hover:bg-muted whitespace-nowrap"
-            >
-              <ShoppingCart className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0" />
-              {itemCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-accent text-accent-foreground">
-                  {itemCount}
-                </Badge>
-              )}
-              <span className="hidden lg:inline-block">Cart</span>
             </Link>
 
             <Link
