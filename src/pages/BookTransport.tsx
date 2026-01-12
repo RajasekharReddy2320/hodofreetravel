@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Search, Filter, ArrowUpDown } from "lucide-react";
+import { Plane, Train, Bus, Search, Filter, ArrowUpDown, ArrowLeftRight } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { TrainServicesGrid } from "@/components/TrainServicesGrid";
 import { AirportAutocomplete } from "@/components/AirportAutocomplete";
 import { FlightResultCard } from "@/components/FlightResultCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 // Security: Search validation schema for flights (IATA codes)
 const flightSearchSchema = z.object({
   from: z.string()
@@ -88,10 +89,15 @@ export default function BookTransport() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+  const [tripType, setTripType] = useState<"oneway" | "roundtrip">("oneway");
   const [passengers, setPassengers] = useState("1");
   
   // Results state
   const [flights, setFlights] = useState<any[]>([]);
+  const [returnFlights, setReturnFlights] = useState<any[]>([]);
+  const [selectedOutbound, setSelectedOutbound] = useState<any | null>(null);
+  const [selectedReturn, setSelectedReturn] = useState<any | null>(null);
   const [trains, setTrains] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
 
@@ -114,42 +120,97 @@ export default function BookTransport() {
       return;
     }
 
+    // Validate return date for round trips
+    if (activeTab === 'flights' && tripType === 'roundtrip') {
+      if (!returnDate) {
+        toast({
+          title: "Invalid Search",
+          description: "Please select a return date",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (new Date(returnDate) < new Date(date)) {
+        toast({
+          title: "Invalid Search",
+          description: "Return date must be after departure date",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
+    // Reset selections for round trip
+    setSelectedOutbound(null);
+    setSelectedReturn(null);
+    
     try {
       const validatedData = validation.data;
-      let functionName = '';
-      let setResults: (data: any[]) => void = () => {};
       
       if (activeTab === 'flights') {
-        functionName = 'search-flights';
-        setResults = setFlights;
-      } else if (activeTab === 'trains') {
-        functionName = 'search-trains';
-        setResults = setTrains;
-      } else if (activeTab === 'buses') {
-        functionName = 'search-buses';
-        setResults = setBuses;
-      }
+        // Search outbound flights
+        const { data: outboundData, error: outboundError } = await supabase.functions.invoke('search-flights', {
+          body: { 
+            from: validatedData.from, 
+            to: validatedData.to, 
+            date: validatedData.date, 
+            passengers: validatedData.passengers 
+          }
+        });
 
-      // Use validated data
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { 
-          from: validatedData.from, 
-          to: validatedData.to, 
-          date: validatedData.date, 
-          passengers: validatedData.passengers 
+        if (outboundError) throw outboundError;
+        setFlights(outboundData.flights || []);
+
+        // Search return flights if round trip
+        if (tripType === 'roundtrip' && returnDate) {
+          const { data: returnData, error: returnError } = await supabase.functions.invoke('search-flights', {
+            body: { 
+              from: validatedData.to, // Swap origin/destination
+              to: validatedData.from, 
+              date: returnDate, 
+              passengers: validatedData.passengers 
+            }
+          });
+
+          if (returnError) throw returnError;
+          setReturnFlights(returnData.flights || []);
+          
+          toast({
+            title: "Search Complete",
+            description: `Found ${outboundData.flights?.length || 0} outbound and ${returnData.flights?.length || 0} return flights`,
+          });
+        } else {
+          setReturnFlights([]);
+          toast({
+            title: "Search Complete",
+            description: `Found ${outboundData.flights?.length || 0} flights`,
+          });
         }
-      });
+      } else {
+        // Train/Bus search
+        let functionName = activeTab === 'trains' ? 'search-trains' : 'search-buses';
+        let setResults = activeTab === 'trains' ? setTrains : setBuses;
 
-      if (error) throw error;
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: { 
+            from: validatedData.from, 
+            to: validatedData.to, 
+            date: validatedData.date, 
+            passengers: validatedData.passengers 
+          }
+        });
 
-      const resultsKey = activeTab === 'flights' ? 'flights' : activeTab === 'trains' ? 'trains' : 'buses';
-      setResults(data[resultsKey] || []);
-      
-      toast({
-        title: "Search Complete",
-        description: `Found ${data[resultsKey]?.length || 0} options`,
-      });
+        if (error) throw error;
+
+        const resultsKey = activeTab === 'trains' ? 'trains' : 'buses';
+        setResults(data[resultsKey] || []);
+        
+        toast({
+          title: "Search Complete",
+          description: `Found ${data[resultsKey]?.length || 0} options`,
+        });
+      }
     } catch (error: any) {
       // Security: Don't log detailed errors
       toast({
@@ -166,17 +227,68 @@ export default function BookTransport() {
   const [filterStops, setFilterStops] = useState("all");
 
   const handleBookFlight = (flight: any, fareType?: string) => {
+    if (tripType === 'roundtrip') {
+      // For round trip, track selected flights
+      if (!selectedOutbound) {
+        setSelectedOutbound({ ...flight, selectedFare: fareType || 'SAVER' });
+        toast({
+          title: "Outbound Flight Selected",
+          description: "Now select your return flight",
+        });
+        return;
+      } else if (!selectedReturn) {
+        setSelectedReturn({ ...flight, selectedFare: fareType || 'SAVER' });
+      }
+    }
+
+    // Navigate to booking with both flights for round trip
     navigate('/book-confirm', { 
       state: { 
         bookingType: 'flight',
-        booking: { ...flight, selectedFare: fareType || 'SAVER' }
+        tripType,
+        booking: tripType === 'roundtrip' && selectedOutbound 
+          ? { 
+              outbound: selectedOutbound,
+              return: { ...flight, selectedFare: fareType || 'SAVER' }
+            }
+          : { ...flight, selectedFare: fareType || 'SAVER' }
+      } 
+    });
+  };
+
+  const handleSelectOutbound = (flight: any, fareType?: string) => {
+    setSelectedOutbound({ ...flight, selectedFare: fareType || 'SAVER' });
+  };
+
+  const handleSelectReturn = (flight: any, fareType?: string) => {
+    setSelectedReturn({ ...flight, selectedFare: fareType || 'SAVER' });
+  };
+
+  const handleBookRoundTrip = () => {
+    if (!selectedOutbound || !selectedReturn) {
+      toast({
+        title: "Select Both Flights",
+        description: "Please select both outbound and return flights",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    navigate('/book-confirm', { 
+      state: { 
+        bookingType: 'flight',
+        tripType: 'roundtrip',
+        booking: { 
+          outbound: selectedOutbound,
+          return: selectedReturn
+        }
       } 
     });
   };
 
   // Sort and filter flights
-  const getFilteredFlights = () => {
-    let filtered = [...flights];
+  const getFilteredFlights = (flightList: any[]) => {
+    let filtered = [...flightList];
     
     // Filter by stops
     if (filterStops === "nonstop") {
@@ -201,6 +313,11 @@ export default function BookTransport() {
     }
 
     return filtered;
+  };
+
+  const getTotalRoundTripPrice = () => {
+    if (!selectedOutbound || !selectedReturn) return 0;
+    return selectedOutbound.price + selectedReturn.price;
   };
 
   const handleBookTrain = (train: any, classType: string) => {
@@ -259,8 +376,31 @@ export default function BookTransport() {
                 <CardDescription>Enter your travel details</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
+                {/* Trip Type Toggle for Flights */}
+                {activeTab === 'flights' && (
+                  <div className="mb-4">
+                    <RadioGroup 
+                      value={tripType} 
+                      onValueChange={(value) => setTripType(value as "oneway" | "roundtrip")}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="oneway" id="oneway" />
+                        <Label htmlFor="oneway" className="cursor-pointer">One Way</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="roundtrip" id="roundtrip" />
+                        <Label htmlFor="roundtrip" className="cursor-pointer flex items-center gap-1">
+                          <ArrowLeftRight className="w-4 h-4" />
+                          Round Trip
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                  <div className="lg:col-span-1">
                     <Label htmlFor="from">From</Label>
                     {activeTab === 'flights' ? (
                       <AirportAutocomplete
@@ -278,7 +418,7 @@ export default function BookTransport() {
                       />
                     )}
                   </div>
-                  <div>
+                  <div className="lg:col-span-1">
                     <Label htmlFor="to">To</Label>
                     {activeTab === 'flights' ? (
                       <AirportAutocomplete
@@ -297,24 +437,42 @@ export default function BookTransport() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="date">Date</Label>
+                    <Label htmlFor="date">{activeTab === 'flights' && tripType === 'roundtrip' ? 'Departure' : 'Date'}</Label>
                     <Input
                       id="date"
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
+                  {activeTab === 'flights' && tripType === 'roundtrip' && (
+                    <div>
+                      <Label htmlFor="returnDate">Return</Label>
+                      <Input
+                        id="returnDate"
+                        type="date"
+                        value={returnDate}
+                        onChange={(e) => setReturnDate(e.target.value)}
+                        min={date || new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                  )}
                   {activeTab === 'flights' && (
                     <div>
-                      <Label htmlFor="passengers">Passengers</Label>
-                      <Input
-                        id="passengers"
-                        type="number"
-                        min="1"
-                        value={passengers}
-                        onChange={(e) => setPassengers(e.target.value)}
-                      />
+                      <Label htmlFor="passengers">Travellers</Label>
+                      <Select value={passengers} onValueChange={setPassengers}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num} {num === 1 ? 'Adult' : 'Adults'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
                   <div className="flex items-end">
@@ -330,7 +488,7 @@ export default function BookTransport() {
 
           {/* Results */}
           <TabsContent value="flights">
-            <div className="space-y-4">
+            <div className="space-y-6">
               {flights.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center text-muted-foreground">
@@ -339,13 +497,143 @@ export default function BookTransport() {
                     <p>Enter your travel details above to find available flights</p>
                   </CardContent>
                 </Card>
+              ) : tripType === 'roundtrip' ? (
+                <>
+                  {/* Round Trip Combined View */}
+                  {(selectedOutbound || selectedReturn) && (
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="font-semibold mb-2">Selected Flights</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {selectedOutbound ? (
+                                <div className="p-3 bg-background rounded-lg border">
+                                  <p className="text-xs text-muted-foreground mb-1">Outbound</p>
+                                  <p className="font-medium">{selectedOutbound.airline} {selectedOutbound.flightNumber}</p>
+                                  <p className="text-sm">{selectedOutbound.fromCode} → {selectedOutbound.toCode} • {selectedOutbound.departureTime}</p>
+                                  <p className="text-primary font-semibold">₹{selectedOutbound.price.toLocaleString('en-IN')}</p>
+                                </div>
+                              ) : (
+                                <div className="p-3 bg-muted rounded-lg border border-dashed">
+                                  <p className="text-sm text-muted-foreground">Select outbound flight below</p>
+                                </div>
+                              )}
+                              {selectedReturn ? (
+                                <div className="p-3 bg-background rounded-lg border">
+                                  <p className="text-xs text-muted-foreground mb-1">Return</p>
+                                  <p className="font-medium">{selectedReturn.airline} {selectedReturn.flightNumber}</p>
+                                  <p className="text-sm">{selectedReturn.fromCode} → {selectedReturn.toCode} • {selectedReturn.departureTime}</p>
+                                  <p className="text-primary font-semibold">₹{selectedReturn.price.toLocaleString('en-IN')}</p>
+                                </div>
+                              ) : (
+                                <div className="p-3 bg-muted rounded-lg border border-dashed">
+                                  <p className="text-sm text-muted-foreground">Select return flight below</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total Fare</p>
+                            <p className="text-2xl font-bold text-primary">₹{getTotalRoundTripPrice().toLocaleString('en-IN')}</p>
+                            <Button 
+                              onClick={handleBookRoundTrip}
+                              disabled={!selectedOutbound || !selectedReturn}
+                              className="mt-2"
+                            >
+                              Book Round Trip
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Outbound Flights */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h2 className="text-xl font-semibold flex items-center gap-2">
+                          <Plane className="w-5 h-5" />
+                          Outbound: {flights[0]?.fromCode} → {flights[0]?.toCode}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">{flights[0]?.date} • {getFilteredFlights(flights).length} flights</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Select value={filterStops} onValueChange={setFilterStops}>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue placeholder="Stops" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Flights</SelectItem>
+                            <SelectItem value="nonstop">Non-stop</SelectItem>
+                            <SelectItem value="1stop">1 Stop</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue placeholder="Sort by" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="price">Price</SelectItem>
+                            <SelectItem value="duration">Duration</SelectItem>
+                            <SelectItem value="departure">Departure</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {getFilteredFlights(flights).map((flight) => (
+                        <div 
+                          key={flight.id}
+                          className={`cursor-pointer transition-all ${selectedOutbound?.id === flight.id ? 'ring-2 ring-primary' : ''}`}
+                          onClick={() => handleSelectOutbound(flight)}
+                        >
+                          <FlightResultCard 
+                            flight={flight} 
+                            onBook={(f, fareType) => handleSelectOutbound(f, fareType)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Return Flights */}
+                  {returnFlights.length > 0 && (
+                    <div className="mt-8">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h2 className="text-xl font-semibold flex items-center gap-2">
+                            <Plane className="w-5 h-5 rotate-180" />
+                            Return: {returnFlights[0]?.fromCode} → {returnFlights[0]?.toCode}
+                          </h2>
+                          <p className="text-sm text-muted-foreground">{returnFlights[0]?.date} • {getFilteredFlights(returnFlights).length} flights</p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        {getFilteredFlights(returnFlights).map((flight) => (
+                          <div 
+                            key={flight.id}
+                            className={`cursor-pointer transition-all ${selectedReturn?.id === flight.id ? 'ring-2 ring-primary' : ''}`}
+                            onClick={() => handleSelectReturn(flight)}
+                          >
+                            <FlightResultCard 
+                              flight={flight} 
+                              onBook={(f, fareType) => handleSelectReturn(f, fareType)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <>
-                  {/* Results Header with Sort & Filter */}
+                  {/* One-way Results Header with Sort & Filter */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                     <div>
                       <h2 className="text-xl font-semibold">
-                        {getFilteredFlights().length} Flights Found
+                        {getFilteredFlights(flights).length} Flights Found
                       </h2>
                       <p className="text-sm text-muted-foreground">
                         {flights[0]?.fromCode} → {flights[0]?.toCode} • {flights[0]?.date}
@@ -386,7 +674,7 @@ export default function BookTransport() {
 
                   {/* Flight Results */}
                   <div className="space-y-4">
-                    {getFilteredFlights().map((flight) => (
+                    {getFilteredFlights(flights).map((flight) => (
                       <FlightResultCard 
                         key={flight.id} 
                         flight={flight} 
@@ -395,7 +683,7 @@ export default function BookTransport() {
                     ))}
                   </div>
 
-                  {getFilteredFlights().length === 0 && (
+                  {getFilteredFlights(flights).length === 0 && (
                     <Card>
                       <CardContent className="p-8 text-center text-muted-foreground">
                         <p>No flights match your filters. Try adjusting your criteria.</p>
