@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Train, Bus, Search } from "lucide-react";
+import { Plane, Train, Bus, Search, Filter, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { TrainServicesGrid } from "@/components/TrainServicesGrid";
 import { AirportAutocomplete } from "@/components/AirportAutocomplete";
-
+import { FlightResultCard } from "@/components/FlightResultCard";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // Security: Search validation schema for flights (IATA codes)
 const flightSearchSchema = z.object({
   from: z.string()
@@ -161,13 +162,45 @@ export default function BookTransport() {
     }
   };
 
-  const handleBookFlight = (flight: any) => {
+  const [sortBy, setSortBy] = useState("price");
+  const [filterStops, setFilterStops] = useState("all");
+
+  const handleBookFlight = (flight: any, fareType?: string) => {
     navigate('/book-confirm', { 
       state: { 
         bookingType: 'flight',
-        booking: flight 
+        booking: { ...flight, selectedFare: fareType || 'SAVER' }
       } 
     });
+  };
+
+  // Sort and filter flights
+  const getFilteredFlights = () => {
+    let filtered = [...flights];
+    
+    // Filter by stops
+    if (filterStops === "nonstop") {
+      filtered = filtered.filter(f => f.stops === 0);
+    } else if (filterStops === "1stop") {
+      filtered = filtered.filter(f => f.stops === 1);
+    }
+
+    // Sort
+    if (sortBy === "price") {
+      filtered.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "duration") {
+      filtered.sort((a, b) => {
+        const aDur = parseInt(a.duration?.replace(/[^\d]/g, '') || '0');
+        const bDur = parseInt(b.duration?.replace(/[^\d]/g, '') || '0');
+        return aDur - bDur;
+      });
+    } else if (sortBy === "departure") {
+      filtered.sort((a, b) => a.departureTime?.localeCompare(b.departureTime));
+    } else if (sortBy === "arrival") {
+      filtered.sort((a, b) => a.arrivalTime?.localeCompare(b.arrivalTime));
+    }
+
+    return filtered;
   };
 
   const handleBookTrain = (train: any, classType: string) => {
@@ -301,46 +334,75 @@ export default function BookTransport() {
               {flights.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center text-muted-foreground">
-                    Search for flights to see available options
+                    <Plane className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-lg font-medium mb-2">Search for Flights</p>
+                    <p>Enter your travel details above to find available flights</p>
                   </CardContent>
                 </Card>
               ) : (
-                flights.map((flight) => (
-                  <Card key={flight.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-2">
-                            <h3 className="font-semibold text-lg">{flight.airline}</h3>
-                            <span className="text-sm text-muted-foreground">{flight.flightNumber}</span>
-                          </div>
-                          <div className="flex items-center gap-8">
-                            <div>
-                              <p className="text-2xl font-bold">{flight.departureTime}</p>
-                              <p className="text-sm text-muted-foreground">{flight.fromCode}</p>
-                            </div>
-                            <div className="text-center flex-1">
-                              <p className="text-sm text-muted-foreground">{flight.duration}</p>
-                              <div className="h-px bg-border my-2" />
-                              <p className="text-xs text-muted-foreground">{flight.stops === 0 ? 'Non-stop' : `${flight.stops} stop`}</p>
-                            </div>
-                            <div>
-                              <p className="text-2xl font-bold">{flight.arrivalTime}</p>
-                              <p className="text-sm text-muted-foreground">{flight.toCode}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right ml-8">
-                          <p className="text-3xl font-bold text-primary">₹{flight.price.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground mb-4">{flight.seatsAvailable} seats left</p>
-                          <Button onClick={() => handleBookFlight(flight)}>
-                            Book Now
-                          </Button>
-                        </div>
+                <>
+                  {/* Results Header with Sort & Filter */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">
+                        {getFilteredFlights().length} Flights Found
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {flights[0]?.fromCode} → {flights[0]?.toCode} • {flights[0]?.date}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-muted-foreground" />
+                        <Select value={filterStops} onValueChange={setFilterStops}>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue placeholder="Stops" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Flights</SelectItem>
+                            <SelectItem value="nonstop">Non-stop</SelectItem>
+                            <SelectItem value="1stop">1 Stop</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
+                      
+                      <div className="flex items-center gap-2">
+                        <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue placeholder="Sort by" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="price">Price</SelectItem>
+                            <SelectItem value="duration">Duration</SelectItem>
+                            <SelectItem value="departure">Departure</SelectItem>
+                            <SelectItem value="arrival">Arrival</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flight Results */}
+                  <div className="space-y-4">
+                    {getFilteredFlights().map((flight) => (
+                      <FlightResultCard 
+                        key={flight.id} 
+                        flight={flight} 
+                        onBook={handleBookFlight}
+                      />
+                    ))}
+                  </div>
+
+                  {getFilteredFlights().length === 0 && (
+                    <Card>
+                      <CardContent className="p-8 text-center text-muted-foreground">
+                        <p>No flights match your filters. Try adjusting your criteria.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>

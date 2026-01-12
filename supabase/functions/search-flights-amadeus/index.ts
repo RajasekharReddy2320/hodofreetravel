@@ -147,7 +147,21 @@ async function searchFlightsAmadeus(
   return response.json();
 }
 
-// Parse Amadeus response to our format
+// Aircraft type names
+const aircraftNames: Record<string, string> = {
+  '320': 'Airbus A320',
+  '321': 'Airbus A321',
+  '32N': 'Airbus A320neo',
+  '738': 'Boeing 737-800',
+  '77W': 'Boeing 777-300ER',
+  '789': 'Boeing 787-9 Dreamliner',
+  '788': 'Boeing 787-8 Dreamliner',
+  'AT7': 'ATR 72',
+  'E90': 'Embraer E190',
+  'DH4': 'Bombardier Q400',
+};
+
+// Parse Amadeus response to our format with detailed info
 function parseFlightOffers(data: any, fromCity: string, toCity: string) {
   if (!data.data || data.data.length === 0) {
     return [];
@@ -155,14 +169,17 @@ function parseFlightOffers(data: any, fromCity: string, toCity: string) {
 
   const dictionaries = data.dictionaries || {};
   const carriers = dictionaries.carriers || {};
+  const aircraft = dictionaries.aircraft || {};
+  const locations = dictionaries.locations || {};
 
   return data.data.map((offer: any, index: number) => {
-    const firstSegment = offer.itineraries?.[0]?.segments?.[0];
-    const lastSegment = offer.itineraries?.[0]?.segments?.slice(-1)[0];
-    const segments = offer.itineraries?.[0]?.segments || [];
+    const itinerary = offer.itineraries?.[0];
+    const segments = itinerary?.segments || [];
+    const firstSegment = segments[0];
+    const lastSegment = segments[segments.length - 1];
 
     // Calculate total duration
-    const totalDuration = offer.itineraries?.[0]?.duration || 'PT0H0M';
+    const totalDuration = itinerary?.duration || 'PT0H0M';
     const durationMatch = totalDuration.match(/PT(\d+)H(\d+)?M?/);
     const hours = durationMatch?.[1] || '0';
     const minutes = durationMatch?.[2] || '0';
@@ -171,32 +188,123 @@ function parseFlightOffers(data: any, fromCity: string, toCity: string) {
     // Get carrier info
     const carrierCode = firstSegment?.carrierCode || '';
     const carrierName = carriers[carrierCode] || carrierCode;
-    const flightNumber = `${carrierCode} ${firstSegment?.number || ''}`;
+    const flightNumber = `${carrierCode}-${firstSegment?.number || ''}`;
 
     // Parse times
     const departureTime = firstSegment?.departure?.at?.split('T')[1]?.slice(0, 5) || '00:00';
     const arrivalTime = lastSegment?.arrival?.at?.split('T')[1]?.slice(0, 5) || '00:00';
 
+    // Get departure and arrival details
+    const depCode = firstSegment?.departure?.iataCode || '';
+    const arrCode = lastSegment?.arrival?.iataCode || '';
+    const depLocation = locations[depCode] || {};
+    const arrLocation = locations[arrCode] || {};
+
     // Get price
-    const price = Math.round(parseFloat(offer.price?.total || '0'));
+    const basePrice = Math.round(parseFloat(offer.price?.total || '0'));
+
+    // Parse segments for detailed info
+    const parsedSegments = segments.map((seg: any) => {
+      const segDuration = seg.duration || 'PT0H0M';
+      const segDurMatch = segDuration.match(/PT(\d+)H(\d+)?M?/);
+      const segHours = segDurMatch?.[1] || '0';
+      const segMins = segDurMatch?.[2] || '0';
+      
+      const aircraftCode = seg.aircraft?.code || '';
+      const aircraftName = aircraftNames[aircraftCode] || aircraft[aircraftCode] || `${aircraftCode}`;
+
+      return {
+        departureTime: seg.departure?.at?.split('T')[1]?.slice(0, 5) || '00:00',
+        arrivalTime: seg.arrival?.at?.split('T')[1]?.slice(0, 5) || '00:00',
+        departureAirport: seg.departure?.iataCode || '',
+        arrivalAirport: seg.arrival?.iataCode || '',
+        departureCity: locations[seg.departure?.iataCode]?.cityCode || seg.departure?.iataCode,
+        arrivalCity: locations[seg.arrival?.iataCode]?.cityCode || seg.arrival?.iataCode,
+        duration: `${segHours}h ${segMins}m`,
+        flightNumber: `${seg.carrierCode}-${seg.number}`,
+        aircraft: aircraftName,
+        airline: carriers[seg.carrierCode] || seg.carrierCode,
+        airlineCode: seg.carrierCode,
+      };
+    });
+
+    // Get stop details
+    const stopDetails = segments.length > 1 
+      ? segments.slice(0, -1).map((seg: any) => seg.arrival?.iataCode)
+      : [];
+
+    // Get cabin class
+    const fareDetails = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0];
+    const cabin = fareDetails?.cabin || 'ECONOMY';
+    const cabinDisplay = cabin.charAt(0) + cabin.slice(1).toLowerCase();
+
+    // Generate fare options
+    const fareOptions = [
+      {
+        type: 'SAVER',
+        name: 'Saver',
+        price: basePrice,
+        checkinBaggage: '15 Kg',
+        cabinBaggage: '7 Kg',
+        cancellation: '₹3,500',
+        dateChange: '₹3,000',
+        seatSelection: 'Chargeable',
+        meals: false,
+      },
+      {
+        type: 'FLEXI',
+        name: 'Flexi',
+        price: Math.round(basePrice * 1.15),
+        checkinBaggage: '20 Kg',
+        cabinBaggage: '7 Kg',
+        cancellation: '₹2,000',
+        dateChange: '₹1,500',
+        seatSelection: 'Free',
+        meals: true,
+      },
+      {
+        type: 'PREMIUM',
+        name: 'Premium Flexi',
+        price: Math.round(basePrice * 1.3),
+        checkinBaggage: '25 Kg',
+        cabinBaggage: '10 Kg',
+        cancellation: 'Free',
+        dateChange: 'Free',
+        seatSelection: 'Free',
+        meals: true,
+      },
+    ];
 
     return {
       id: `FL${offer.id || index + 1}`,
       airline: carrierName,
+      airlineCode: carrierCode,
       flightNumber,
       from: fromCity,
       to: toCity,
-      fromCode: firstSegment?.departure?.iataCode || '',
-      toCode: lastSegment?.arrival?.iataCode || '',
+      fromCode: depCode,
+      toCode: arrCode,
+      fromCity: depLocation.cityCode || fromCity,
+      toCity: arrLocation.cityCode || toCity,
       departureTime,
       arrivalTime,
       duration: formattedDuration,
       stops: segments.length - 1,
-      price,
+      stopDetails,
+      price: basePrice,
       seatsAvailable: offer.numberOfBookableSeats || Math.floor(Math.random() * 20) + 5,
       date: firstSegment?.departure?.at?.split('T')[0] || '',
-      cabin: offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.cabin || 'ECONOMY',
-      bookingClass: offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.class || 'Y',
+      cabin: cabinDisplay,
+      aircraft: parsedSegments[0]?.aircraft || 'Airbus A320',
+      bookingClass: fareDetails?.class || 'Y',
+      segments: parsedSegments,
+      fareOptions,
+      amenities: {
+        wifi: carrierCode === 'UK' || carrierCode === 'AI',
+        meals: cabin !== 'ECONOMY' || carrierCode === 'AI' || carrierCode === 'UK',
+        entertainment: carrierCode === 'AI' || carrierCode === 'UK',
+        power: cabin !== 'ECONOMY',
+      },
     };
   });
 }
