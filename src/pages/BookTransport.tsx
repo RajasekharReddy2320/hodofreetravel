@@ -11,9 +11,42 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { TrainServicesGrid } from "@/components/TrainServicesGrid";
+import { AirportAutocomplete } from "@/components/AirportAutocomplete";
 
-// Security: Search validation schema
-const searchSchema = z.object({
+// Security: Search validation schema for flights (IATA codes)
+const flightSearchSchema = z.object({
+  from: z.string()
+    .trim()
+    .min(3, "Please select an airport")
+    .max(3, "Please select an airport")
+    .regex(/^[A-Z]{3}$/, "Please select a valid airport"),
+  to: z.string()
+    .trim()
+    .min(3, "Please select an airport")
+    .max(3, "Please select an airport")
+    .regex(/^[A-Z]{3}$/, "Please select a valid airport"),
+  date: z.string()
+    .refine((d) => !isNaN(Date.parse(d)), "Invalid date format")
+    .refine((d) => {
+      const selectedDate = new Date(d);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return selectedDate >= today;
+    }, "Date cannot be in the past")
+    .refine((d) => {
+      const selectedDate = new Date(d);
+      const maxDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() + 1);
+      return selectedDate <= maxDate;
+    }, "Cannot book more than 1 year in advance"),
+  passengers: z.number()
+    .int("Must be a whole number")
+    .min(1, "At least 1 passenger required")
+    .max(9, "Maximum 9 passengers allowed")
+});
+
+// Search validation schema for trains/buses (city names)
+const generalSearchSchema = z.object({
   from: z.string()
     .trim()
     .min(2, "Origin must be at least 2 characters")
@@ -62,8 +95,9 @@ export default function BookTransport() {
   const [buses, setBuses] = useState<any[]>([]);
 
   const handleSearch = async () => {
-    // Security: Validate search parameters
-    const validation = searchSchema.safeParse({
+    // Security: Use different validation based on transport type
+    const schema = activeTab === 'flights' ? flightSearchSchema : generalSearchSchema;
+    const validation = schema.safeParse({
       from,
       to,
       date,
@@ -195,21 +229,39 @@ export default function BookTransport() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <Label htmlFor="from">From</Label>
-                    <Input
-                      id="from"
-                      placeholder="e.g., Delhi"
-                      value={from}
-                      onChange={(e) => setFrom(e.target.value)}
-                    />
+                    {activeTab === 'flights' ? (
+                      <AirportAutocomplete
+                        id="from"
+                        placeholder="Search airport..."
+                        value={from}
+                        onChange={(value) => setFrom(value)}
+                      />
+                    ) : (
+                      <Input
+                        id="from"
+                        placeholder="e.g., Delhi"
+                        value={from}
+                        onChange={(e) => setFrom(e.target.value)}
+                      />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="to">To</Label>
-                    <Input
-                      id="to"
-                      placeholder="e.g., Mumbai"
-                      value={to}
-                      onChange={(e) => setTo(e.target.value)}
-                    />
+                    {activeTab === 'flights' ? (
+                      <AirportAutocomplete
+                        id="to"
+                        placeholder="Search airport..."
+                        value={to}
+                        onChange={(value) => setTo(value)}
+                      />
+                    ) : (
+                      <Input
+                        id="to"
+                        placeholder="e.g., Mumbai"
+                        value={to}
+                        onChange={(e) => setTo(e.target.value)}
+                      />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="date">Date</Label>
