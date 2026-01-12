@@ -8,8 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useCart } from "@/contexts/CartContext";
-import { Plane, Train, Bus, CreditCard, ShoppingCart } from "lucide-react";
+import { Plane, Train, Bus, Hotel, CreditCard, IndianRupee } from "lucide-react";
 import { z } from "zod";
 
 // Security: Input validation schema
@@ -33,7 +32,6 @@ export default function BookConfirm() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { addToCart } = useCart();
   const { bookingType, booking } = location.state || {};
   
   const [loading, setLoading] = useState(false);
@@ -50,68 +48,10 @@ export default function BookConfirm() {
     if (bookingType === 'train' && booking.classes && booking.selectedClass) {
       return booking.classes[booking.selectedClass]?.price || booking.price || 0;
     }
+    if (bookingType === 'hotel') {
+      return booking.pricePerNight || booking.totalPrice || 0;
+    }
     return booking.price || 0;
-  };
-
-  const handleAddToCart = () => {
-    // Security: Validate passenger details
-    const validation = passengerSchema.safeParse({
-      name: passengerName,
-      email: passengerEmail,
-      phone: passengerPhone
-    });
-
-    if (!validation.success) {
-      toast({
-        title: "Invalid Details",
-        description: validation.error.issues[0].message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const cartItem: any = {
-      id: `cart-${Date.now()}`,
-      booking_type: bookingType,
-      from_location: booking.from || booking.fromCode,
-      to_location: booking.to || booking.toCode,
-      departure_date: booking.date,
-      departure_time: booking.departureTime,
-      arrival_time: booking.arrivalTime,
-      price_inr: getPrice(),
-      passenger_name: passengerName,
-      passenger_email: passengerEmail,
-      passenger_phone: passengerPhone,
-    };
-
-    if (bookingType === 'flight') {
-      cartItem.service_name = booking.airline;
-      cartItem.service_number = booking.flightNumber;
-      cartItem.seat_number = `${Math.floor(Math.random() * 30) + 1}${String.fromCharCode(65 + Math.floor(Math.random() * 6))}`;
-      cartItem.class_type = 'Economy';
-      cartItem.duration = booking.duration;
-    } else if (bookingType === 'train') {
-      cartItem.service_name = booking.name;
-      cartItem.service_number = booking.trainNumber;
-      cartItem.seat_number = `${booking.selectedClass}-${Math.floor(Math.random() * 100) + 1}`;
-      cartItem.class_type = booking.selectedClass;
-      cartItem.duration = booking.duration;
-    } else if (bookingType === 'bus') {
-      cartItem.service_name = booking.operator;
-      cartItem.service_number = booking.busType;
-      cartItem.seat_number = `${Math.floor(Math.random() * 40) + 1}`;
-      cartItem.class_type = booking.busType;
-      cartItem.duration = booking.duration;
-    }
-
-    addToCart(cartItem);
-    
-    toast({
-      title: "Added to Cart!",
-      description: "Continue booking or checkout from cart",
-    });
-
-    navigate("/book-transport");
   };
 
   const handlePayment = async () => {
@@ -142,12 +82,12 @@ export default function BookConfirm() {
         passenger_name: validatedData.name,
         passenger_email: validatedData.email,
         passenger_phone: validatedData.phone,
-        from_location: booking.from || booking.fromCode,
-        to_location: booking.to || booking.toCode,
-        departure_date: booking.date,
-        departure_time: booking.departureTime,
-        arrival_date: booking.date,
-        arrival_time: booking.arrivalTime,
+        from_location: booking.from || booking.fromCode || booking.location || '',
+        to_location: booking.to || booking.toCode || booking.location || '',
+        departure_date: booking.date || new Date().toISOString().split('T')[0],
+        departure_time: booking.departureTime || '12:00',
+        arrival_date: booking.date || new Date().toISOString().split('T')[0],
+        arrival_time: booking.arrivalTime || '14:00',
         price_inr: getPrice(),
       };
 
@@ -155,7 +95,7 @@ export default function BookConfirm() {
         bookingData.service_name = booking.airline;
         bookingData.service_number = booking.flightNumber;
         bookingData.seat_number = `${Math.floor(Math.random() * 30) + 1}${String.fromCharCode(65 + Math.floor(Math.random() * 6))}`;
-        bookingData.class_type = 'Economy';
+        bookingData.class_type = booking.cabin || 'Economy';
       } else if (bookingType === 'train') {
         bookingData.service_name = booking.name;
         bookingData.service_number = booking.trainNumber;
@@ -166,6 +106,12 @@ export default function BookConfirm() {
         bookingData.service_number = booking.busType;
         bookingData.seat_number = `${Math.floor(Math.random() * 40) + 1}`;
         bookingData.class_type = booking.busType;
+      } else if (bookingType === 'hotel') {
+        bookingData.service_name = booking.name;
+        bookingData.service_number = `HTL-${booking.id}`;
+        bookingData.class_type = booking.roomType || 'Standard Room';
+        bookingData.from_location = booking.location;
+        bookingData.to_location = booking.location;
       }
 
       const { data, error } = await supabase.functions.invoke('create-booking', {
@@ -206,7 +152,106 @@ export default function BookConfirm() {
     }
   };
 
-  const Icon = bookingType === 'flight' ? Plane : bookingType === 'train' ? Train : Bus;
+  const getIcon = () => {
+    switch (bookingType) {
+      case 'flight': return Plane;
+      case 'train': return Train;
+      case 'bus': return Bus;
+      case 'hotel': return Hotel;
+      default: return Plane;
+    }
+  };
+
+  const Icon = getIcon();
+
+  const renderBookingDetails = () => {
+    if (bookingType === 'hotel') {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Hotel className="h-5 w-5" />
+              Hotel Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="font-semibold text-lg">{booking.name}</p>
+              <p className="text-sm text-muted-foreground">{booking.location}</p>
+            </div>
+            <Separator />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Room Type</p>
+                <p className="font-semibold">{booking.roomType || 'Standard Room'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Rating</p>
+                <p className="font-semibold">{'⭐'.repeat(booking.rating || 3)}</p>
+              </div>
+            </div>
+            {booking.amenities && (
+              <div>
+                <p className="text-sm text-muted-foreground">Amenities</p>
+                <p className="font-semibold">{booking.amenities.slice(0, 3).join(', ')}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Icon className="h-5 w-5" />
+            {bookingType === 'flight' ? 'Flight' : bookingType === 'train' ? 'Train' : 'Bus'} Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-semibold text-lg">
+                {bookingType === 'flight' && booking.airline}
+                {bookingType === 'train' && booking.name}
+                {bookingType === 'bus' && booking.operator}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {bookingType === 'flight' && booking.flightNumber}
+                {bookingType === 'train' && booking.trainNumber}
+                {bookingType === 'bus' && booking.busType}
+              </p>
+            </div>
+            {bookingType === 'train' && (
+              <div className="text-right">
+                <p className="font-semibold">{booking.selectedClass} Class</p>
+              </div>
+            )}
+          </div>
+          <Separator />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">From</p>
+              <p className="font-semibold">{booking.from || booking.fromCode}</p>
+              <p className="text-lg font-bold">{booking.departureTime}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">To</p>
+              <p className="font-semibold">{booking.to || booking.toCode}</p>
+              <p className="text-lg font-bold">{booking.arrivalTime}</p>
+            </div>
+          </div>
+          {booking.date && (
+            <div>
+              <p className="text-sm text-muted-foreground">Journey Date</p>
+              <p className="font-semibold">{new Date(booking.date).toLocaleDateString('en-IN', { dateStyle: 'full' })}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -221,58 +266,13 @@ export default function BookConfirm() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Booking Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" />
-                  {bookingType === 'flight' ? 'Flight' : bookingType === 'train' ? 'Train' : 'Bus'} Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-lg">
-                      {bookingType === 'flight' && booking.airline}
-                      {bookingType === 'train' && booking.name}
-                      {bookingType === 'bus' && booking.operator}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {bookingType === 'flight' && booking.flightNumber}
-                      {bookingType === 'train' && booking.trainNumber}
-                      {bookingType === 'bus' && booking.busType}
-                    </p>
-                  </div>
-                  {bookingType === 'train' && (
-                    <div className="text-right">
-                      <p className="font-semibold">{booking.selectedClass} Class</p>
-                    </div>
-                  )}
-                </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">From</p>
-                    <p className="font-semibold">{booking.from || booking.fromCode}</p>
-                    <p className="text-lg font-bold">{booking.departureTime}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">To</p>
-                    <p className="font-semibold">{booking.to || booking.toCode}</p>
-                    <p className="text-lg font-bold">{booking.arrivalTime}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Journey Date</p>
-                  <p className="font-semibold">{new Date(booking.date).toLocaleDateString('en-IN', { dateStyle: 'full' })}</p>
-                </div>
-              </CardContent>
-            </Card>
+            {renderBookingDetails()}
 
-            {/* Passenger Details */}
+            {/* Passenger/Guest Details */}
             <Card>
               <CardHeader>
-                <CardTitle>Passenger Details</CardTitle>
-                <CardDescription>Enter traveler information</CardDescription>
+                <CardTitle>{bookingType === 'hotel' ? 'Guest' : 'Passenger'} Details</CardTitle>
+                <CardDescription>Enter {bookingType === 'hotel' ? 'guest' : 'traveler'} information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -317,41 +317,38 @@ export default function BookConfirm() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Fare</span>
-                    <span>₹{getPrice().toLocaleString()}</span>
+                    <span className="text-muted-foreground">Base {bookingType === 'hotel' ? 'Rate' : 'Fare'}</span>
+                    <span className="flex items-center">
+                      <IndianRupee className="h-4 w-4" />
+                      {getPrice().toLocaleString('en-IN')}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Taxes & Fees</span>
-                    <span>₹{Math.floor(getPrice() * 0.12).toLocaleString()}</span>
+                    <span className="flex items-center">
+                      <IndianRupee className="h-4 w-4" />
+                      {Math.floor(getPrice() * 0.12).toLocaleString('en-IN')}
+                    </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Amount</span>
-                    <span className="text-primary">₹{Math.floor(getPrice() * 1.12).toLocaleString()}</span>
+                    <span className="text-primary flex items-center">
+                      <IndianRupee className="h-5 w-5" />
+                      {Math.floor(getPrice() * 1.12).toLocaleString('en-IN')}
+                    </span>
                   </div>
                 </div>
                 <Separator />
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full" 
-                    size="lg"
-                    onClick={handlePayment}
-                    disabled={loading}
-                  >
-                    <CreditCard className="mr-2 h-5 w-5" />
-                    {loading ? 'Processing...' : 'Book Now'}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className="w-full" 
-                    size="lg"
-                    onClick={handleAddToCart}
-                    disabled={loading}
-                  >
-                    <ShoppingCart className="mr-2 h-5 w-5" />
-                    Add to Cart
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={handlePayment}
+                  disabled={loading}
+                >
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  {loading ? 'Processing...' : 'Book Now'}
+                </Button>
                 <p className="text-xs text-center text-muted-foreground">
                   Secure payment powered by Razorpay
                 </p>

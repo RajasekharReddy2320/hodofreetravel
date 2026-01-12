@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { CartProvider } from "@/contexts/CartContext";
 import { ReducedMotionProvider } from "@/contexts/ReducedMotionContext";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { NotificationInitializer } from "@/components/NotificationInitializer";
@@ -28,7 +27,6 @@ import BookingHub from "./pages/BookingHub";
 import BookConfirm from "./pages/BookConfirm";
 import MyTickets from "./pages/MyTickets";
 import TicketDetails from "./pages/TicketDetails";
-import Cart from "./pages/Cart";
 import CreatePost from "./pages/CreatePost";
 
 import NotFound from "./pages/NotFound";
@@ -49,53 +47,50 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <ReducedMotionProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <NotificationPermissionBanner />
-            <NotificationInitializer />
-            <BrowserRouter>
-              <AIChatBot />
-              <MobileBackButton />
-              <MobileBottomNav />
-              <Routes>
-                <Route path="/" element={<Explore />} />
-                <Route path="/explore/:tab?" element={<Explore />} />
-                <Route path="/welcome" element={<Welcome />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/plan-trip" element={<PlannerV2 />} />
-                <Route path="/planner" element={<PlannerV2 />} />
-                <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
-                <Route path="/create-trip" element={<CreateTrip />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/:userId" element={<UserProfile />} />
-                <Route path="/search" element={<SearchUsers />} />
-                <Route path="/book-transport" element={<BookingHub />} />
-                <Route path="/book-transport/:section?" element={<BookingHub />} />
-                <Route path="/book-confirm" element={<BookConfirm />} />
-                <Route path="/my-tickets" element={<MyTickets />} />
-                <Route path="/ticket-details" element={<TicketDetails />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/create-post" element={<CreatePost />} />
-                
-                <Route path="/book" element={<Book />} />
-                <Route path="/travel-agents" element={<TravelAgents />} />
-                <Route path="/local-guides" element={<LocalGuides />} />
-                <Route path="/photo-vault" element={<PhotoVault />} />
-                <Route path="/knowledge" element={<Knowledge />} />
-                <Route path="/trains/pnr-enquiry" element={<PNREnquiry />} />
-                <Route path="/trains/file-tdr" element={<FileTDR />} />
-                <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
-                <Route path="/trains/schedule" element={<TrainSchedule />} />
-                <Route path="/trains/track-train" element={<TrackTrain />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </CartProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <NotificationPermissionBanner />
+          <NotificationInitializer />
+          <BrowserRouter>
+            <AIChatBot />
+            <MobileBackButton />
+            <MobileBottomNav />
+            <Routes>
+              <Route path="/" element={<Explore />} />
+              <Route path="/explore/:tab?" element={<Explore />} />
+              <Route path="/welcome" element={<Welcome />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/plan-trip" element={<PlannerV2 />} />
+              <Route path="/planner" element={<PlannerV2 />} />
+              <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
+              <Route path="/create-trip" element={<CreateTrip />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/:userId" element={<UserProfile />} />
+              <Route path="/search" element={<SearchUsers />} />
+              <Route path="/book-transport" element={<BookingHub />} />
+              <Route path="/book-transport/:section?" element={<BookingHub />} />
+              <Route path="/book-confirm" element={<BookConfirm />} />
+              <Route path="/my-tickets" element={<MyTickets />} />
+              <Route path="/ticket-details" element={<TicketDetails />} />
+              <Route path="/create-post" element={<CreatePost />} />
+              
+              <Route path="/book" element={<Book />} />
+              <Route path="/travel-agents" element={<TravelAgents />} />
+              <Route path="/local-guides" element={<LocalGuides />} />
+              <Route path="/photo-vault" element={<PhotoVault />} />
+              <Route path="/knowledge" element={<Knowledge />} />
+              <Route path="/trains/pnr-enquiry" element={<PNREnquiry />} />
+              <Route path="/trains/file-tdr" element={<FileTDR />} />
+              <Route path="/trains/chart-vacancy" element={<ChartVacancy />} />
+              <Route path="/trains/schedule" element={<TrainSchedule />} />
+              <Route path="/trains/track-train" element={<TrackTrain />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
       </ReducedMotionProvider>
     </ThemeProvider>
   </QueryClientProvider>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,6 @@ import { MapPin, Calendar, Plane, Train, Bus, IndianRupee, User, Mail, Phone } f
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useCart } from "@/contexts/CartContext";
 
 interface ItineraryBookingDialogProps {
   open: boolean;
@@ -33,7 +33,7 @@ export const ItineraryBookingDialog = ({
   postAuthor 
 }: ItineraryBookingDialogProps) => {
   const { toast } = useToast();
-  const { addToCart } = useCart();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [passengerDetails, setPassengerDetails] = useState({
     name: "",
@@ -77,17 +77,15 @@ export const ItineraryBookingDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Calculate estimated price based on budget
       const estimatedPrice = itinerary.estimatedBudget || 5000;
 
-      // Create booking via edge function
       const { data, error } = await supabase.functions.invoke("create-booking", {
         body: {
           booking_type: getBookingType(itinerary.transportation),
           passenger_name: passengerDetails.name,
           passenger_email: passengerDetails.email,
           passenger_phone: passengerDetails.phone,
-          from_location: "Your Location", // User's location
+          from_location: "Your Location",
           to_location: itinerary.destination,
           departure_date: itinerary.startDate,
           departure_time: "09:00",
@@ -96,11 +94,6 @@ export const ItineraryBookingDialog = ({
           service_name: `${postAuthor}'s Itinerary`,
           service_number: `IT-${Date.now()}`,
           price_inr: estimatedPrice,
-          details: {
-            isFromItinerary: true,
-            activities: itinerary.activities || [],
-            originalAuthor: postAuthor,
-          },
         },
       });
 
@@ -113,8 +106,8 @@ export const ItineraryBookingDialog = ({
 
       onOpenChange(false);
       setPassengerDetails({ name: "", email: "", phone: "" });
+      navigate('/my-tickets');
     } catch (error: any) {
-      console.error("Booking error:", error);
       toast({
         title: "Booking failed",
         description: error.message || "Unable to create booking. Please try again.",
@@ -123,44 +116,6 @@ export const ItineraryBookingDialog = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleAddToCart = () => {
-    if (!passengerDetails.name || !passengerDetails.email || !passengerDetails.phone) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all passenger details",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const estimatedPrice = itinerary.estimatedBudget || 5000;
-
-    addToCart({
-      id: `itinerary-${Date.now()}`,
-      booking_type: getBookingType(itinerary.transportation),
-      service_name: `${postAuthor}'s Itinerary`,
-      service_number: `IT-${Date.now()}`,
-      from_location: "Your Location",
-      to_location: itinerary.destination,
-      departure_date: itinerary.startDate,
-      departure_time: "09:00",
-      arrival_time: "18:00",
-      duration: "Full Trip",
-      price_inr: estimatedPrice,
-      passenger_name: passengerDetails.name,
-      passenger_email: passengerDetails.email,
-      passenger_phone: passengerDetails.phone,
-    });
-
-    toast({
-      title: "Added to cart!",
-      description: "Itinerary booking added to your cart",
-    });
-
-    onOpenChange(false);
-    setPassengerDetails({ name: "", email: "", phone: "" });
   };
 
   return (
@@ -174,7 +129,6 @@ export const ItineraryBookingDialog = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Itinerary Summary */}
           <Card className="p-4 bg-muted/30">
             <h3 className="font-semibold mb-3">Trip Details</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -204,12 +158,12 @@ export const ItineraryBookingDialog = ({
                 </div>
               </div>
 
-              {itinerary.estimatedBudget && (
+              {itinerary.estimatedBudget && itinerary.estimatedBudget > 0 && (
                 <div className="flex items-center gap-2">
                   <IndianRupee className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Estimated Cost</p>
-                    <p className="font-medium">₹{itinerary.estimatedBudget.toLocaleString()}</p>
+                    <p className="font-medium">₹{itinerary.estimatedBudget.toLocaleString('en-IN')}</p>
                   </div>
                 </div>
               )}
@@ -237,7 +191,6 @@ export const ItineraryBookingDialog = ({
 
           <Separator />
 
-          {/* Passenger Details */}
           <div className="space-y-4">
             <h3 className="font-semibold">Passenger Details</h3>
             
@@ -252,7 +205,6 @@ export const ItineraryBookingDialog = ({
                   placeholder="Enter your full name"
                   value={passengerDetails.name}
                   onChange={(e) => setPassengerDetails({ ...passengerDetails, name: e.target.value })}
-                  required
                 />
               </div>
 
@@ -267,7 +219,6 @@ export const ItineraryBookingDialog = ({
                   placeholder="your.email@example.com"
                   value={passengerDetails.email}
                   onChange={(e) => setPassengerDetails({ ...passengerDetails, email: e.target.value })}
-                  required
                 />
               </div>
 
@@ -282,30 +233,14 @@ export const ItineraryBookingDialog = ({
                   placeholder="+91 XXXXX XXXXX"
                   value={passengerDetails.phone}
                   onChange={(e) => setPassengerDetails({ ...passengerDetails, phone: e.target.value })}
-                  required
                 />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleAddToCart}
-              disabled={isLoading}
-            >
-              Add to Cart
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={handleBookNow}
-              disabled={isLoading}
-            >
-              {isLoading ? "Booking..." : "Book Now"}
-            </Button>
-          </div>
+          <Button className="w-full" onClick={handleBookNow} disabled={isLoading}>
+            {isLoading ? "Booking..." : "Book Now"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
